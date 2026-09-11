@@ -1,7 +1,7 @@
 package rrr;
 
 import mindustry.mod.Mod;
-import content.blocks.chaowall;   // 导入你的方块类
+import rrr.content.blocks.chaowall;   // 导入你的方块类
 
 public class Main extends Mod {
     @Override
