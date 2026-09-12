@@ -7,16 +7,27 @@ import mindustry.game.EventType.BlockBuildEndEvent;
 import mindustry.gen.Building;
 import mindustry.gen.Groups;
 import mindustry.mod.Mod;
+import mindustry.world.Block;
 
 public class MyFactoryGroupMod extends Mod {
 
-    /** 静态单例，防止重复创建 */
     private static TestFactoryBlock testFactory;
+    private static boolean registered = false;
 
     @Override
     public void loadContent() {
-        // 如果已存在同名方块，就不重复注册
-        if (Vars.content.block("test-factory") != null) return;
+        if (registered) return;
+        registered = true;
+
+        // 用遍历方式检查是否已存在，最稳
+        boolean exists = false;
+        for (Block b : Vars.content.blocks()) {
+            if ("test-factory".equals(b.name)) {
+                exists = true;
+                break;
+            }
+        }
+        if (exists) return;
 
         if (testFactory == null) {
             testFactory = new TestFactoryBlock();
