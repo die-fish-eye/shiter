@@ -10,14 +10,22 @@ import mindustry.mod.Mod;
 
 public class MyFactoryGroupMod extends Mod {
 
+    /** 静态单例，防止重复创建 */
+    private static TestFactoryBlock testFactory;
+
     @Override
     public void loadContent() {
-        Vars.content.blocks().add(new TestFactoryBlock());
+        // 如果已存在同名方块，就不重复注册
+        if (Vars.content.block("test-factory") != null) return;
+
+        if (testFactory == null) {
+            testFactory = new TestFactoryBlock();
+        }
+        Vars.content.blocks().add(testFactory);
     }
 
     @Override
     public void init() {
-        // 主路径：放置/拆除事件
         Events.on(BlockBuildEndEvent.class, e -> {
             if (e.tile == null || e.tile.build == null) return;
             if (e.breaking) {
@@ -27,12 +35,9 @@ public class MyFactoryGroupMod extends Mod {
             }
         });
 
-        // 兜底：每 0.5 秒清理失效建筑 + 分配遗漏建筑
         Timer.schedule(() -> {
-            // ① 清理已拆除的建筑
             GroupManager.cleanup();
 
-            // ② 检查：没群的，或与邻居不同群的，重新分配
             for (Building b : Groups.build) {
                 if (b == null || b.block == null || !b.block.hasItems) continue;
                 FactoryGroup g = GroupManager.getGroup(b);
