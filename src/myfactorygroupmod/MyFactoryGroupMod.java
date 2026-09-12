@@ -14,30 +14,42 @@ import mindustry.world.Block;
 
 public class MyFactoryGroupMod extends Mod {
 
-    private static final String BLOCK_NAME = "test-factory";
-
     @Override
     public void loadContent() {
-        Log.info("[factory-group-mod] loadContent 被调用");
+        Log.info("[fgm] loadContent 开始，当前方块总数: @", Vars.content.blocks().size);
 
-        boolean exists = false;
-        int sameNameCount = 0;
+        // 移除所有旧的 TestFactoryBlock 实例（无论什么名字）
+        List<Block> toRemove = new ArrayList<>();
         for (Block b : Vars.content.blocks()) {
-            if (b.name != null && b.name.equals(BLOCK_NAME)) {
-                sameNameCount++;
-                exists = true;
+            if (b instanceof TestFactoryBlock) {
+                toRemove.add(b);
             }
         }
-        Log.info("[factory-group-mod] 注册前，同名方块数量: @", sameNameCount);
+        for (Block b : toRemove) {
+            Log.info("[fgm] loadContent 移除旧实例: @", b.name);
+            Vars.content.blocks().remove(b);
+        }
 
-        if (exists) return;
+        TestFactoryBlock block = new TestFactoryBlock();
+        Vars.content.blocks().add(block);
 
-        Vars.content.blocks().add(new TestFactoryBlock());
+        int cnt = 0;
+        for (Block b : Vars.content.blocks()) {
+            if (b instanceof TestFactoryBlock) cnt++;
+        }
+        Log.info("[fgm] loadContent 结束时 TestFactoryBlock 数量: @", cnt);
     }
 
     @Override
     public void init() {
-        dedupe();
+        int cnt = 0;
+        for (Block b : Vars.content.blocks()) {
+            if (b instanceof TestFactoryBlock) {
+                cnt++;
+                Log.info("[fgm] init 中找到: @", b.name);
+            }
+        }
+        Log.info("[fgm] init 时 TestFactoryBlock 数量: @", cnt);
 
         Events.on(BlockBuildEndEvent.class, e -> {
             if (e.tile == null || e.tile.build == null) return;
@@ -50,7 +62,6 @@ public class MyFactoryGroupMod extends Mod {
 
         Timer.schedule(() -> {
             GroupManager.cleanup();
-
             for (Building b : Groups.build) {
                 if (b == null || b.block == null || !b.block.hasItems) continue;
                 FactoryGroup g = GroupManager.getGroup(b);
@@ -59,26 +70,5 @@ public class MyFactoryGroupMod extends Mod {
                 }
             }
         }, 0.5f, 0.5f);
-    }
-
-    private void dedupe() {
-        List<Block> duplicates = new ArrayList<>();
-        boolean firstFound = false;
-        int count = 0;
-        for (Block b : Vars.content.blocks()) {
-            if (b.name != null && b.name.equals(BLOCK_NAME)) {
-                count++;
-                if (!firstFound) {
-                    firstFound = true;
-                } else {
-                    duplicates.add(b);
-                }
-            }
-        }
-        Log.info("[factory-group-mod] init 时同名方块数量: @", count);
-        for (Block b : duplicates) {
-            Log.info("[factory-group-mod] 移除重复方块: @", b);
-            Vars.content.blocks().remove(b);
-        }
     }
 }

@@ -15,7 +15,7 @@ import mindustry.world.blocks.production.GenericCrafter;
 public class TestFactoryBlock extends GenericCrafter {
 
     public TestFactoryBlock() {
-        super("test-factory");
+        super("fgm-test-factory");
 
         localizedName = "测试工厂";
         description = "用于测试工厂群的工厂";
