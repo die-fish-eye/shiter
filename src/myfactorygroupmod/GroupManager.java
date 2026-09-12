@@ -16,7 +16,11 @@ public class GroupManager {
         return buildingToGroup.get(building);
     }
 
-    /** 清理已拆除的建筑，返回是否清理过 */
+    /** 白名单：只有被替换成 GroupCrafterBuild 的方块才算工厂 */
+    public static boolean isFactory(Building b) {
+        return b instanceof GroupCrafterBuild;
+    }
+
     public static boolean cleanup() {
         boolean changed = false;
         ObjectMap<Building, FactoryGroup> copy = new ObjectMap<>(buildingToGroup);
@@ -30,14 +34,11 @@ public class GroupManager {
         return changed;
     }
 
-    /** 判断建筑是否仍然存在于世界中 */
     private static boolean isAlive(Building b) {
         if (b.tile == null) return false;
-        if (b.tile.build != b) return false;
-        return true;
+        return b.tile.build == b;
     }
 
-    /** 把建筑四个方向的所有相邻格子上的建筑加入队列（正确支持多格建筑） */
     private static void enqueueNeighbors(Building b, Queue<Building> queue, ObjectSet<Building> visited) {
         int size = b.block.size;
         for (int dx = 0; dx < size; dx++) {
@@ -51,7 +52,7 @@ public class GroupManager {
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
-                    if (!t.build.block.hasItems) continue;
+                    if (!isFactory(t.build)) continue;
                     if (visited.contains(t.build)) continue;
                     visited.add(t.build);
                     queue.addLast(t.build);
@@ -60,9 +61,8 @@ public class GroupManager {
         }
     }
 
-    /** 检查建筑是否有邻居不属于它的群 */
     public static boolean hasForeignNeighbor(Building b) {
-        if (!b.block.hasItems) return false;
+        if (!isFactory(b)) return false;
         FactoryGroup myGroup = buildingToGroup.get(b);
         int size = b.block.size;
         for (int dx = 0; dx < size; dx++) {
@@ -76,7 +76,7 @@ public class GroupManager {
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
-                    if (!t.build.block.hasItems) continue;
+                    if (!isFactory(t.build)) continue;
                     FactoryGroup otherGroup = buildingToGroup.get(t.build);
                     if (myGroup == null || otherGroup == null || otherGroup != myGroup) {
                         return true;
@@ -88,7 +88,7 @@ public class GroupManager {
     }
 
     public static void onBuildingPlaced(Building building) {
-        if (building.block == null || !building.block.hasItems) return;
+        if (!isFactory(building)) return;
 
         Queue<Building> queue = new Queue<>();
         ObjectSet<Building> visited = new ObjectSet<>();
@@ -99,12 +99,8 @@ public class GroupManager {
 
         while (queue.size > 0) {
             Building current = queue.removeFirst();
-
             FactoryGroup existing = buildingToGroup.get(current);
-            if (existing != null) {
-                foundGroups.add(existing);
-            }
-
+            if (existing != null) foundGroups.add(existing);
             enqueueNeighbors(current, queue, visited);
         }
 
@@ -120,6 +116,7 @@ public class GroupManager {
                     targetGroup.members.add(b);
                 }
                 targetGroup.absorbItems(other);
+                targetGroup.absorbLiquids(other);
             }
         }
 
@@ -131,7 +128,6 @@ public class GroupManager {
 
     public static void onBuildingRemoved(Building building) {
         if (building == null) return;
-
         FactoryGroup group = buildingToGroup.get(building);
         if (group == null) return;
 
@@ -179,7 +175,7 @@ public class GroupManager {
                         Tile t = Vars.world.tile(nx, ny);
                         if (t == null || t.build == null) continue;
                         if (t.build == current) continue;
-                        if (!t.build.block.hasItems) continue;
+                        if (!isFactory(t.build)) continue;
                         if (visited.contains(t.build)) continue;
                         if (!candidates.contains(t.build)) continue;
                         visited.add(t.build);
