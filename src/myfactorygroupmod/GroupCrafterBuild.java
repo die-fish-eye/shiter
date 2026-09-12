@@ -34,7 +34,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
     // ===== 物品共享 =====
 
-    /** 群内所有物品一律接收，不受原版配方限制 */
     @Override
     public boolean acceptItem(Building source, Item item) {
         FactoryGroup myGroup = GroupManager.getGroup(this);
@@ -59,7 +58,8 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         FactoryGroup myGroup = GroupManager.getGroup(this);
         FactoryGroup srcGroup = source == null ? null : GroupManager.getGroup(source);
         if (myGroup != null && srcGroup != null && myGroup == srcGroup) {
-            return block.hasLiquids && liquids.get(liquid) < block.liquidCapacity * myGroup.members.size;
+            return block.hasLiquids
+                && liquids.get(liquid) < block.liquidCapacity * myGroup.members.size;
         }
         return super.acceptLiquid(source, liquid);
     }
@@ -97,7 +97,7 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
             }
         }
 
-        if (group.sharedLiquids.total() > 0) {
+        if (group.sharedLiquids.currentAmount() > 0) {
             table.add("[accent]共享液体[]").left().padTop(4f).row();
             for (Liquid liquid : mindustry.Vars.content.liquids()) {
                 float amount = group.sharedLiquids.get(liquid);

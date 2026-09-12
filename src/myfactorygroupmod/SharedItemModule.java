@@ -1,56 +1,59 @@
 package myfactorygroupmod;
 
 import mindustry.gen.Building;
-import mindustry.type.Item;
-import mindustry.world.modules.ItemModule;
+import mindustry.type.Liquid;
+import mindustry.world.modules.LiquidModule;
 
-public class SharedItemModule extends ItemModule {
+public class SharedLiquidModule extends LiquidModule {
 
     public final Building owner;
 
-    public SharedItemModule(Building owner) {
+    public SharedLiquidModule(Building owner) {
         this.owner = owner;
     }
 
-    private ItemModule target() {
+    private LiquidModule target() {
         FactoryGroup g = GroupManager.getGroup(owner);
-        return g == null ? null : g.sharedItems;
+        return g == null ? null : g.sharedLiquids;
     }
 
-    @Override public int get(Item item) {
-        ItemModule t = target();
-        return t == null ? super.get(item) : t.get(item);
+    @Override
+    public float currentAmount() {
+        LiquidModule t = target();
+        return t == null ? super.currentAmount() : t.currentAmount();
     }
-    @Override public int get(int id) {
-        ItemModule t = target();
-        return t == null ? super.get(id) : t.get(id);
+
+    @Override
+    public float get(Liquid liquid) {
+        LiquidModule t = target();
+        return t == null ? super.get(liquid) : t.get(liquid);
     }
-    @Override public void set(Item item, int amount) {
-        ItemModule t = target();
-        if (t == null) super.set(item, amount); else t.set(item, amount);
+
+    @Override
+    public void set(Liquid liquid, float amount) {
+        LiquidModule t = target();
+        if (t == null) super.set(liquid, amount);
+        else t.set(liquid, amount);
     }
-    @Override public void add(Item item, int amount) {
-        ItemModule t = target();
-        if (t == null) super.add(item, amount); else t.add(item, amount);
+
+    @Override
+    public void add(Liquid liquid, float amount) {
+        LiquidModule t = target();
+        if (t == null) super.add(liquid, amount);
+        else t.add(liquid, amount);
     }
-    @Override public void remove(Item item, int amount) {
-        ItemModule t = target();
-        if (t == null) super.remove(item, amount); else t.remove(item, amount);
+
+    @Override
+    public void remove(Liquid liquid, float amount) {
+        LiquidModule t = target();
+        if (t == null) super.remove(liquid, amount);
+        else t.remove(liquid, amount);
     }
-    @Override public boolean has(Item item, int amount) {
-        ItemModule t = target();
-        return t == null ? super.has(item, amount) : t.has(item, amount);
-    }
-    @Override public int total() {
-        ItemModule t = target();
-        return t == null ? super.total() : t.total();
-    }
-    @Override public boolean any() {
-        ItemModule t = target();
-        return t == null ? super.any() : t.any();
-    }
-    @Override public void clear() {
-        ItemModule t = target();
-        if (t == null) super.clear(); else t.clear();
+
+    @Override
+    public void clear() {
+        LiquidModule t = target();
+        if (t == null) super.clear();
+        else t.clear();
     }
 }
