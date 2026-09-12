@@ -18,7 +18,7 @@ public class MyFactoryGroupMod extends Mod {
     public void loadContent() {
         Log.info("[fgm] loadContent 开始，当前方块总数: @", Vars.content.blocks().size);
 
-        // 移除所有旧的 TestFactoryBlock 实例（无论什么名字）
+        // 移除所有旧的 TestFactoryBlock 实例
         List<Block> toRemove = new ArrayList<>();
         for (Block b : Vars.content.blocks()) {
             if (b instanceof TestFactoryBlock) {
@@ -26,30 +26,50 @@ public class MyFactoryGroupMod extends Mod {
             }
         }
         for (Block b : toRemove) {
-            Log.info("[fgm] loadContent 移除旧实例: @", b.name);
+            Log.info("[fgm] 移除旧实例 hash=@", System.identityHashCode(b));
             Vars.content.blocks().remove(b);
         }
 
-        TestFactoryBlock block = new TestFactoryBlock();
-        Vars.content.blocks().add(block);
+        // 添加新方块
+        Vars.content.blocks().add(new TestFactoryBlock());
 
+        // 打印每个 TestFactoryBlock 的 hash
         int cnt = 0;
         for (Block b : Vars.content.blocks()) {
-            if (b instanceof TestFactoryBlock) cnt++;
+            if (b instanceof TestFactoryBlock) {
+                Log.info("[fgm] loadContent 中的实例 hash=@ name=@",
+                        System.identityHashCode(b), b.name);
+                cnt++;
+            }
         }
-        Log.info("[fgm] loadContent 结束时 TestFactoryBlock 数量: @", cnt);
+        Log.info("[fgm] loadContent 结束时数量: @", cnt);
     }
 
     @Override
     public void init() {
-        int cnt = 0;
+        // 去重：如果列表中真的有多个不同实例，移除多余的
+        Block first = null;
+        List<Block> dupes = new ArrayList<>();
         for (Block b : Vars.content.blocks()) {
             if (b instanceof TestFactoryBlock) {
-                cnt++;
-                Log.info("[fgm] init 中找到: @", b.name);
+                if (first == null) {
+                    first = b;
+                } else if (b != first) {
+                    dupes.add(b);
+                }
             }
         }
-        Log.info("[fgm] init 时 TestFactoryBlock 数量: @", cnt);
+        for (Block b : dupes) {
+            Log.info("[fgm] init 移除重复实例 hash=@ name=@",
+                    System.identityHashCode(b), b.name);
+            Vars.content.blocks().remove(b);
+        }
+
+        int finalCnt = 0;
+        for (Block b : Vars.content.blocks()) {
+            if (b instanceof TestFactoryBlock) finalCnt++;
+        }
+        Log.info("[fgm] init 结束时数量: @", finalCnt);
 
         Events.on(BlockBuildEndEvent.class, e -> {
             if (e.tile == null || e.tile.build == null) return;
