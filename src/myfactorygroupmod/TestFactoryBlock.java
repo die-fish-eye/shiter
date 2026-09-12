@@ -1,5 +1,6 @@
 package myfactorygroupmod;
 
+import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.struct.ObjectMap;
 import mindustry.content.Items;
@@ -14,6 +15,10 @@ public class TestFactoryBlock extends GenericCrafter {
 
     public TestFactoryBlock() {
         super("test-factory");
+
+        // ★ 关键：给个短的中文名，避免面板被长 name 撑开
+        localizedName = "测试工厂";
+        description = "用于测试工厂群的工厂";
 
         size = 2;
         health = 200;
@@ -31,11 +36,9 @@ public class TestFactoryBlock extends GenericCrafter {
 
         requirements(Category.production, ItemStack.with(Items.copper, 10));
 
-        // 关键：非静态内部类的方法引用会自动捕获 this
         buildType = TestFactoryBuild::new;
     }
 
-    // 注意：这里不是 static！
     public class TestFactoryBuild extends GenericCrafterBuild {
 
         @Override
@@ -49,19 +52,14 @@ public class TestFactoryBlock extends GenericCrafter {
             table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
             table.add("[lightgray]成员总数: []" + group.members.size).left().row();
 
-            // 按方块种类统计（名字过长时用省略号）
+            // 按方块种类统计 —— 每行用 sub-table 保证整体左对齐
             ObjectMap<Block, Integer> counts = new ObjectMap<>();
             for (Building b : group.members) {
-            counts.put(b.block, counts.get(b.block, 0) + 1);
-}
+                counts.put(b.block, counts.get(b.block, 0) + 1);
+            }
             for (ObjectMap.Entry<Block, Integer> e : counts) {
-            table.image(e.key.uiIcon).size(20f).padRight(4f);
-
-            arc.scene.ui.Label nameLabel = new arc.scene.ui.Label(e.key.localizedName + " × " + e.value);
-            nameLabel.setEllipsis(true);
-            nameLabel.setWrap(false);
-            table.add(nameLabel).left().width(160f).row();
-}
+                table.add(buildRow(e.key.uiIcon, e.key.localizedName + " × " + e.value)).left().row();
+            }
 
             // 共享库存
             if (group.sharedItems.total() > 0) {
@@ -69,11 +67,22 @@ public class TestFactoryBlock extends GenericCrafter {
                 for (Item item : mindustry.Vars.content.items()) {
                     int amount = group.sharedItems.get(item);
                     if (amount > 0) {
-                        table.image(item.uiIcon).size(20f).padRight(4f);
-                        table.add(item.localizedName + ": " + amount).left().row();
+                        table.add(buildRow(item.uiIcon, item.localizedName + ": " + amount)).left().row();
                     }
                 }
             }
+        }
+
+        /** 图标 + 文本 左对齐的一行 */
+        private Table buildRow(arc.graphics.g2d.TextureRegion icon, String text) {
+            Table row = new Table();
+            row.left();
+            row.image(icon).size(20f).padRight(6f);
+            Label label = new Label(text);
+            label.setEllipsis(true);
+            label.setWrap(false);
+            row.add(label).left().maxWidth(180f);
+            return row;
         }
     }
 }
