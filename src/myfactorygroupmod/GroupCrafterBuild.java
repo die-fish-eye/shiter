@@ -13,11 +13,24 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
     public GroupCrafterBuild(GenericCrafter crafter) {
         crafter.super();
-        // 关键：把原版 items 替换为群共享代理
+    }
+
+    @Override
+    public void created() {
+        super.created();
+        // ★ super.created() 会重新 new 一个 ItemModule，这里再替换一次
         this.items = new SharedItemModule(this);
     }
 
-    /** 群内总容量 = 单个工厂容量 × 成员数 */
+    @Override
+    public void updateTile() {
+        // 保险：万一还有别的逻辑替换了 items，这里兜一次
+        if (!(items instanceof SharedItemModule)) {
+            items = new SharedItemModule(this);
+        }
+        super.updateTile();
+    }
+
     @Override
     public int getMaximumAccepted(Item item) {
         FactoryGroup g = GroupManager.getGroup(this);
@@ -35,10 +48,9 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         if (group == null || group.members.size <= 1) return;
 
         table.row();
-        table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
+        table.add("[accent]── 群组织 ──[]").left().padTop(6f).row();
         table.add("[lightgray]成员总数: []" + group.members.size).left().row();
 
-        // 按方块种类统计
         ObjectMap<Block, Integer> counts = new ObjectMap<>();
         for (Building b : group.members) {
             counts.put(b.block, counts.get(b.block, 0) + 1);
@@ -48,7 +60,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
                  .left().row();
         }
 
-        // 共享库存
         if (group.sharedItems.total() > 0) {
             table.add("[accent]共享库存[]").left().padTop(4f).row();
             for (Item item : mindustry.Vars.content.items()) {

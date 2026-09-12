@@ -1,16 +1,14 @@
 package myfactorygroupmod;
 
+import arc.util.Log;
 import mindustry.gen.Building;
 import mindustry.type.Item;
 import mindustry.world.modules.ItemModule;
 
-/**
- * 一个"代理" ItemModule：读写全部转发到所属工厂群的 sharedItems。
- * 如果建筑不属于任何群，则回退到本地父类实现。
- */
 public class SharedItemModule extends ItemModule {
 
     public final Building owner;
+    private static int logCount = 0;
 
     public SharedItemModule(Building owner) {
         this.owner = owner;
@@ -18,6 +16,11 @@ public class SharedItemModule extends ItemModule {
 
     private ItemModule target() {
         FactoryGroup g = GroupManager.getGroup(owner);
+        if (logCount < 10) {
+            String ownerName = (owner == null || owner.block == null) ? "null" : owner.block.name;
+            Log.info("[fgm] target() owner=@ group=@", ownerName, g == null ? "null" : "有");
+            logCount++;
+        }
         return g == null ? null : g.sharedItems;
     }
 
