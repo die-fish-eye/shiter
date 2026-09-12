@@ -16,68 +16,47 @@ public class MyFactoryGroupMod extends Mod {
 
     @Override
     public void loadContent() {
-        Log.info("[fgm] loadContent 开始，当前方块总数: @", Vars.content.blocks().size);
-
-        // 移除所有旧的 TestFactoryBlock 实例
-        List<Block> toRemove = new ArrayList<>();
+        // 移除旧的
+        List<Block> old = new ArrayList<>();
         for (Block b : Vars.content.blocks()) {
-            if (b instanceof TestFactoryBlock) {
-                toRemove.add(b);
-            }
+            if (b instanceof TestFactoryBlock) old.add(b);
         }
-        for (Block b : toRemove) {
-            Log.info("[fgm] 移除旧实例 hash=@", System.identityHashCode(b));
-            Vars.content.blocks().remove(b);
-        }
+        for (Block b : old) Vars.content.blocks().remove(b);
 
-        // 添加新方块
+        int before = Vars.content.blocks().size;
         Vars.content.blocks().add(new TestFactoryBlock());
+        int after = Vars.content.blocks().size;
 
-        // 打印每个 TestFactoryBlock 的 hash
-        int cnt = 0;
-        for (Block b : Vars.content.blocks()) {
-            if (b instanceof TestFactoryBlock) {
-                Log.info("[fgm] loadContent 中的实例 hash=@ name=@",
-                        System.identityHashCode(b), b.name);
-                cnt++;
-            }
-        }
-        Log.info("[fgm] loadContent 结束时数量: @", cnt);
+        Log.info("[fgm] add 前=@ add 后=@ 差值=@", before, after, after - before);
     }
 
     @Override
     public void init() {
-        // 去重：如果列表中真的有多个不同实例，移除多余的
-        Block first = null;
-        List<Block> dupes = new ArrayList<>();
-        for (Block b : Vars.content.blocks()) {
-            if (b instanceof TestFactoryBlock) {
-                if (first == null) {
-                    first = b;
-                } else if (b != first) {
-                    dupes.add(b);
+        // 反复移除，直到只剩下 1 个
+        for (int round = 0; round < 5; round++) {
+            int cnt = 0;
+            Block first = null;
+            for (Block b : Vars.content.blocks()) {
+                if (b instanceof TestFactoryBlock) {
+                    cnt++;
+                    if (first == null) first = b;
                 }
             }
-        }
-        for (Block b : dupes) {
-            Log.info("[fgm] init 移除重复实例 hash=@ name=@",
-                    System.identityHashCode(b), b.name);
-            Vars.content.blocks().remove(b);
+            Log.info("[fgm] init 第 @ 轮，count=@", round, cnt);
+            if (cnt <= 1) break;
+            Vars.content.blocks().remove(first);
         }
 
         int finalCnt = 0;
         for (Block b : Vars.content.blocks()) {
             if (b instanceof TestFactoryBlock) finalCnt++;
         }
-        Log.info("[fgm] init 结束时数量: @", finalCnt);
+        Log.info("[fgm] init 最终 count=@", finalCnt);
 
         Events.on(BlockBuildEndEvent.class, e -> {
             if (e.tile == null || e.tile.build == null) return;
-            if (e.breaking) {
-                GroupManager.onBuildingRemoved(e.tile.build);
-            } else {
-                GroupManager.onBuildingPlaced(e.tile.build);
-            }
+            if (e.breaking) GroupManager.onBuildingRemoved(e.tile.build);
+            else GroupManager.onBuildingPlaced(e.tile.build);
         });
 
         Timer.schedule(() -> {
