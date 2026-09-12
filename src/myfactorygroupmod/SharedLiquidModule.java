@@ -33,26 +33,6 @@ public class SharedLiquidModule extends LiquidModule {
         LiquidModule t = target();
         if (t == null) super.remove(liquid, amount); else t.remove(liquid, amount);
     }
-    @Override public boolean has(Liquid liquid) {
-        LiquidModule t = target();
-        return t == null ? super.has(liquid) : t.has(liquid);
-    }
-    @Override public boolean has(Liquid liquid, float amount) {
-        LiquidModule t = target();
-        return t == null ? super.has(liquid, amount) : t.has(liquid, amount);
-    }
-    @Override public float total() {
-        LiquidModule t = target();
-        return t == null ? super.total() : t.total();
-    }
-    @Override public float currentAmount() {
-        LiquidModule t = target();
-        return t == null ? super.currentAmount() : t.currentAmount();
-    }
-    @Override public boolean any() {
-        LiquidModule t = target();
-        return t == null ? super.any() : t.any();
-    }
     @Override public void clear() {
         LiquidModule t = target();
         if (t == null) super.clear(); else t.clear();
