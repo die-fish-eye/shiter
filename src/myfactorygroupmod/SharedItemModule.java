@@ -73,12 +73,6 @@ public class SharedItemModule extends ItemModule {
     }
 
     @Override
-    public boolean isEmpty() {
-        ItemModule t = target();
-        return t == null ? super.isEmpty() : t.isEmpty();
-    }
-
-    @Override
     public void clear() {
         ItemModule t = target();
         if (t == null) super.clear();
