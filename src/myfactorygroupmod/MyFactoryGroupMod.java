@@ -20,7 +20,6 @@ public class MyFactoryGroupMod extends Mod {
     public void loadContent() {
         Log.info("[factory-group-mod] loadContent 被调用");
 
-        // 遍历检查是否已有同名方块
         boolean exists = false;
         int sameNameCount = 0;
         for (Block b : Vars.content.blocks()) {
@@ -38,7 +37,6 @@ public class MyFactoryGroupMod extends Mod {
 
     @Override
     public void init() {
-        // 去重：移除所有同名方块中的多余项，只保留第一个
         dedupe();
 
         Events.on(BlockBuildEndEvent.class, e -> {
@@ -80,7 +78,7 @@ public class MyFactoryGroupMod extends Mod {
         Log.info("[factory-group-mod] init 时同名方块数量: @", count);
         for (Block b : duplicates) {
             Log.info("[factory-group-mod] 移除重复方块: @", b);
-            b.remove();
+            Vars.content.blocks().remove(b);
         }
     }
 }
