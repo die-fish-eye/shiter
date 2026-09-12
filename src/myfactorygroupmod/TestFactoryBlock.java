@@ -26,32 +26,27 @@ public class TestFactoryBlock extends GenericCrafter {
         itemCapacity = 20;
         craftTime = 60f;
 
-        // 消耗 1 铜，产出 1 铅
         consumeItem(Items.copper, 1);
         outputItem = new ItemStack(Items.lead, 1);
 
-        // 建造需求：10 铜
         requirements(Category.production, ItemStack.with(Items.copper, 10));
 
-        // 关键：指定建筑类型
+        // 关键：非静态内部类的方法引用会自动捕获 this
         buildType = TestFactoryBuild::new;
     }
 
-    public static class TestFactoryBuild extends GenericCrafterBuild {
+    // 注意：这里不是 static！
+    public class TestFactoryBuild extends GenericCrafterBuild {
 
         @Override
         public void display(Table table) {
-            // 先显示原版内容（名称、血条等）
             super.display(table);
 
             FactoryGroup group = GroupManager.getGroup(this);
             if (group == null || group.members.size <= 1) return;
 
-            // 分割线
             table.row();
             table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
-
-            // 成员总数
             table.add("[lightgray]成员总数: []" + group.members.size).left().row();
 
             // 按方块种类统计
