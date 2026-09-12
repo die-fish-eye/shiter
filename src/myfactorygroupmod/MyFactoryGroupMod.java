@@ -1,14 +1,20 @@
 package myfactorygroupmod;
 
 import arc.Events;
+import mindustry.Vars;
 import mindustry.game.EventType.BlockBuildEndEvent;
 import mindustry.mod.Mod;
 
 public class MyFactoryGroupMod extends Mod {
 
     @Override
+    public void loadContent() {
+        // 注册自定义测试工厂方块
+        Vars.content.blocks().add(new TestFactoryBlock());
+    }
+
+    @Override
     public void init() {
-        // 监听方块放置/拆除事件
         Events.on(BlockBuildEndEvent.class, e -> {
             if (e.tile == null || e.tile.build == null) return;
             if (e.breaking) {
@@ -18,7 +24,7 @@ public class MyFactoryGroupMod extends Mod {
             }
         });
 
-        // 注册 UI 对话框
-        GroupInfoDialog.register();
+        // UI 注册（现在只做占位，实际展示已经移到悬停面板）
+        // GroupInfoDialog.register();
     }
 }
