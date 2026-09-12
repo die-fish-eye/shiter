@@ -10,14 +10,64 @@ import mindustry.world.Tile;
 public class GroupManager {
 
     private static final ObjectMap<Building, FactoryGroup> buildingToGroup = new ObjectMap<>();
+    private static final int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
 
     public static FactoryGroup getGroup(Building building) {
         return buildingToGroup.get(building);
     }
 
+    /** 把建筑的四个方向的所有相邻格子上的建筑加入队列（正确支持多格建筑） */
+    private static void enqueueNeighbors(Building b, Queue<Building> queue, ObjectSet<Building> visited) {
+        int size = b.block.size;
+        for (int dx = 0; dx < size; dx++) {
+            for (int dy = 0; dy < size; dy++) {
+                int tx = b.tile.x + dx;
+                int ty = b.tile.y + dy;
+                for (int[] d : DIRS) {
+                    int nx = tx + d[0];
+                    int ny = ty + d[1];
+                    if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
+                    Tile t = Vars.world.tile(nx, ny);
+                    if (t == null || t.build == null) continue;
+                    if (t.build == b) continue;
+                    if (!t.build.block.hasItems) continue;
+                    if (visited.contains(t.build)) continue;
+                    visited.add(t.build);
+                    queue.addLast(t.build);
+                }
+            }
+        }
+    }
+
+    /** 检查建筑是否有邻居不属于它的群（用于 Timer 决定是否重新分配） */
+    public static boolean hasForeignNeighbor(Building b) {
+        if (!b.block.hasItems) return false;
+        FactoryGroup myGroup = buildingToGroup.get(b);
+        int size = b.block.size;
+        for (int dx = 0; dx < size; dx++) {
+            for (int dy = 0; dy < size; dy++) {
+                int tx = b.tile.x + dx;
+                int ty = b.tile.y + dy;
+                for (int[] d : DIRS) {
+                    int nx = tx + d[0];
+                    int ny = ty + d[1];
+                    if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
+                    Tile t = Vars.world.tile(nx, ny);
+                    if (t == null || t.build == null) continue;
+                    if (t.build == b) continue;
+                    if (!t.build.block.hasItems) continue;
+                    FactoryGroup otherGroup = buildingToGroup.get(t.build);
+                    if (myGroup == null || otherGroup == null || otherGroup != myGroup) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public static void onBuildingPlaced(Building building) {
         if (!building.block.hasItems) return;
-        if (buildingToGroup.containsKey(building)) return;
 
         Queue<Building> queue = new Queue<>();
         ObjectSet<Building> visited = new ObjectSet<>();
@@ -25,9 +75,6 @@ public class GroupManager {
 
         queue.addLast(building);
         visited.add(building);
-
-        int[] dx = {1, -1, 0, 0};
-        int[] dy = {0, 0, 1, -1};
 
         while (queue.size > 0) {
             Building current = queue.removeFirst();
@@ -37,20 +84,7 @@ public class GroupManager {
                 foundGroups.add(existing);
             }
 
-            for (int i = 0; i < 4; i++) {
-                int nx = current.tile.x + dx[i];
-                int ny = current.tile.y + dy[i];
-
-                if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
-
-                Tile neighbor = Vars.world.tile(nx, ny);
-                if (neighbor == null || neighbor.build == null) continue;
-                if (!neighbor.build.block.hasItems) continue;
-                if (visited.contains(neighbor.build)) continue;
-
-                visited.add(neighbor.build);
-                queue.addLast(neighbor.build);
-            }
+            enqueueNeighbors(current, queue, visited);
         }
 
         FactoryGroup targetGroup;
@@ -58,7 +92,6 @@ public class GroupManager {
             targetGroup = new FactoryGroup();
         } else {
             targetGroup = foundGroups.first();
-            // 合并其他群
             for (FactoryGroup other : foundGroups) {
                 if (other == targetGroup) continue;
                 for (Building b : other.members) {
@@ -107,28 +140,30 @@ public class GroupManager {
         queue.addLast(start);
         visited.add(start);
 
-        int[] dx = {1, -1, 0, 0};
-        int[] dy = {0, 0, 1, -1};
-
         while (queue.size > 0) {
             Building current = queue.removeFirst();
             newGroup.add(current);
             buildingToGroup.put(current, newGroup);
 
-            for (int i = 0; i < 4; i++) {
-                int nx = current.tile.x + dx[i];
-                int ny = current.tile.y + dy[i];
-
-                if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
-
-                Tile neighbor = Vars.world.tile(nx, ny);
-                if (neighbor == null || neighbor.build == null) continue;
-                if (!neighbor.build.block.hasItems) continue;
-                if (visited.contains(neighbor.build)) continue;
-                if (!candidates.contains(neighbor.build)) continue;
-
-                visited.add(neighbor.build);
-                queue.addLast(neighbor.build);
+            int size = current.block.size;
+            for (int dx = 0; dx < size; dx++) {
+                for (int dy = 0; dy < size; dy++) {
+                    int tx = current.tile.x + dx;
+                    int ty = current.tile.y + dy;
+                    for (int[] d : DIRS) {
+                        int nx = tx + d[0];
+                        int ny = ty + d[1];
+                        if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
+                        Tile t = Vars.world.tile(nx, ny);
+                        if (t == null || t.build == null) continue;
+                        if (t.build == current) continue;
+                        if (!t.build.block.hasItems) continue;
+                        if (visited.contains(t.build)) continue;
+                        if (!candidates.contains(t.build)) continue;
+                        visited.add(t.build);
+                        queue.addLast(t.build);
+                    }
+                }
             }
         }
     }

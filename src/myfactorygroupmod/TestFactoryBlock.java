@@ -49,15 +49,19 @@ public class TestFactoryBlock extends GenericCrafter {
             table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
             table.add("[lightgray]成员总数: []" + group.members.size).left().row();
 
-            // 按方块种类统计
+            // 按方块种类统计（名字过长时用省略号）
             ObjectMap<Block, Integer> counts = new ObjectMap<>();
             for (Building b : group.members) {
-                counts.put(b.block, counts.get(b.block, 0) + 1);
-            }
+            counts.put(b.block, counts.get(b.block, 0) + 1);
+}
             for (ObjectMap.Entry<Block, Integer> e : counts) {
-                table.image(e.key.uiIcon).size(20f).padRight(4f);
-                table.add(e.key.localizedName + " × " + e.value).left().row();
-            }
+            table.image(e.key.uiIcon).size(20f).padRight(4f);
+
+            arc.scene.ui.Label nameLabel = new arc.scene.ui.Label(e.key.localizedName + " × " + e.value);
+            nameLabel.setEllipsis(true);
+            nameLabel.setWrap(false);
+            table.add(nameLabel).left().width(160f).row();
+}
 
             // 共享库存
             if (group.sharedItems.total() > 0) {

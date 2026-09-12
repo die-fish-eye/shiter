@@ -17,7 +17,6 @@ public class MyFactoryGroupMod extends Mod {
 
     @Override
     public void init() {
-        // 主路径：放置/拆除事件
         Events.on(BlockBuildEndEvent.class, e -> {
             if (e.tile == null || e.tile.build == null) return;
             if (e.breaking) {
@@ -27,14 +26,14 @@ public class MyFactoryGroupMod extends Mod {
             }
         });
 
-        // 兜底：每 0.5 秒扫一遍所有建筑，把遗漏的 hasItems 建筑登记进群
-        // 这样即使 MindustryX 不触发 BlockBuildEndEvent 也能工作
+        // 每 0.5 秒检查：没群的，或与邻居不同群的，重新分配
         Timer.schedule(() -> {
             for (Building b : Groups.build) {
-                if (b == null || b.block == null) continue;
-                if (!b.block.hasItems) continue;
-                if (GroupManager.getGroup(b) != null) continue;
-                GroupManager.onBuildingPlaced(b);
+                if (b == null || b.block == null || !b.block.hasItems) continue;
+                FactoryGroup g = GroupManager.getGroup(b);
+                if (g == null || GroupManager.hasForeignNeighbor(b)) {
+                    GroupManager.onBuildingPlaced(b);
+                }
             }
         }, 0.5f, 0.5f);
     }
