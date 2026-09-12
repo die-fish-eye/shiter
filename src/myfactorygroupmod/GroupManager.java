@@ -16,7 +16,28 @@ public class GroupManager {
         return buildingToGroup.get(building);
     }
 
-    /** 把建筑的四个方向的所有相邻格子上的建筑加入队列（正确支持多格建筑） */
+    /** 清理已拆除的建筑，返回是否清理过 */
+    public static boolean cleanup() {
+        boolean changed = false;
+        ObjectMap<Building, FactoryGroup> copy = new ObjectMap<>(buildingToGroup);
+        for (ObjectMap.Entry<Building, FactoryGroup> e : copy) {
+            Building b = e.key;
+            if (b == null || !isAlive(b)) {
+                onBuildingRemoved(b);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /** 判断建筑是否仍然存在于世界中 */
+    private static boolean isAlive(Building b) {
+        if (b.tile == null) return false;
+        if (b.tile.build != b) return false;
+        return true;
+    }
+
+    /** 把建筑四个方向的所有相邻格子上的建筑加入队列（正确支持多格建筑） */
     private static void enqueueNeighbors(Building b, Queue<Building> queue, ObjectSet<Building> visited) {
         int size = b.block.size;
         for (int dx = 0; dx < size; dx++) {
@@ -39,7 +60,7 @@ public class GroupManager {
         }
     }
 
-    /** 检查建筑是否有邻居不属于它的群（用于 Timer 决定是否重新分配） */
+    /** 检查建筑是否有邻居不属于它的群 */
     public static boolean hasForeignNeighbor(Building b) {
         if (!b.block.hasItems) return false;
         FactoryGroup myGroup = buildingToGroup.get(b);
@@ -67,7 +88,7 @@ public class GroupManager {
     }
 
     public static void onBuildingPlaced(Building building) {
-        if (!building.block.hasItems) return;
+        if (building.block == null || !building.block.hasItems) return;
 
         Queue<Building> queue = new Queue<>();
         ObjectSet<Building> visited = new ObjectSet<>();
@@ -109,6 +130,8 @@ public class GroupManager {
     }
 
     public static void onBuildingRemoved(Building building) {
+        if (building == null) return;
+
         FactoryGroup group = buildingToGroup.get(building);
         if (group == null) return;
 
@@ -124,7 +147,6 @@ public class GroupManager {
             buildingToGroup.remove(b);
         }
         group.members.clear();
-        group.sharedItems.clear();
 
         for (Building b : allMembers) {
             if (buildingToGroup.containsKey(b)) continue;

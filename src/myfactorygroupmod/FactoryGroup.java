@@ -1,7 +1,8 @@
 package myfactorygroupmod;
 
-import arc.struct.ObjectSet;
 import arc.struct.ObjectMap;
+import arc.struct.ObjectSet;
+import mindustry.Vars;
 import mindustry.gen.Building;
 import mindustry.type.Item;
 import mindustry.world.modules.ItemModule;
@@ -47,7 +48,7 @@ public class FactoryGroup {
 
     /** 合并另一个群的物品到本群（用于群合并） */
     public void absorbItems(FactoryGroup other) {
-        for (Item item : mindustry.Vars.content.items()) {
+        for (Item item : Vars.content.items()) {
             int amount = other.sharedItems.get(item);
             if (amount > 0) {
                 sharedItems.add(item, amount);

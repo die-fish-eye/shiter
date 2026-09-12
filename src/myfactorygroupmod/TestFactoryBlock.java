@@ -1,5 +1,6 @@
 package myfactorygroupmod;
 
+import arc.graphics.g2d.TextureRegion;
 import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import arc.struct.ObjectMap;
@@ -16,7 +17,6 @@ public class TestFactoryBlock extends GenericCrafter {
     public TestFactoryBlock() {
         super("test-factory");
 
-        // ★ 关键：给个短的中文名，避免面板被长 name 撑开
         localizedName = "测试工厂";
         description = "用于测试工厂群的工厂";
 
@@ -52,7 +52,7 @@ public class TestFactoryBlock extends GenericCrafter {
             table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
             table.add("[lightgray]成员总数: []" + group.members.size).left().row();
 
-            // 按方块种类统计 —— 每行用 sub-table 保证整体左对齐
+            // 按方块种类统计
             ObjectMap<Block, Integer> counts = new ObjectMap<>();
             for (Building b : group.members) {
                 counts.put(b.block, counts.get(b.block, 0) + 1);
@@ -74,7 +74,7 @@ public class TestFactoryBlock extends GenericCrafter {
         }
 
         /** 图标 + 文本 左对齐的一行 */
-        private Table buildRow(arc.graphics.g2d.TextureRegion icon, String text) {
+        private Table buildRow(TextureRegion icon, String text) {
             Table row = new Table();
             row.left();
             row.image(icon).size(20f).padRight(6f);
