@@ -45,27 +45,27 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return super.acceptLiquid(source, liquid);
     }
 
-    // ===== dump：一帧内把所有物品都尝试扔出去，不再 return =====
     @Override
-    public void dump() {
-        if (items.total() <= 0) return;
+    public boolean dump() {
+    if (items.total() <= 0) return false;
 
-        for (int i = 0; i < Vars.content.items().size; i++) {
-            Item item = Vars.content.item(i);
-            if (items.get(item) <= 0) continue;
-            if (!canDump(item)) continue;
+    boolean dumped = false;
+    for (int i = 0; i < Vars.content.items().size; i++) {
+        Item item = Vars.content.item(i);
+        if (items.get(item) <= 0) continue;
 
-            for (Building b : proximity) {
-                if (b.acceptItem(this, item)) {
-                    int removed = offload(item);
-                    if (removed > 0) {
-                        b.handleItem(this, item);
-                        break;
-                    }
-                }
+        for (Building b : proximity) {
+            if (b == this) continue;
+            if (b.acceptItem(this, item)) {
+                b.handleItem(this, item);
+                offload(item);
+                dumped = true;
+                break;
             }
         }
     }
+    return dumped;
+}
 
     // ===== UI =====
     @Override
