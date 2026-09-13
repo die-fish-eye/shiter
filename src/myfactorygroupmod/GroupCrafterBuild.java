@@ -3,7 +3,6 @@ package myfactorygroupmod;
 import arc.scene.ui.layout.Table;
 import mindustry.gen.Building;
 import mindustry.type.Item;
-import mindustry.type.ItemStack;
 import mindustry.type.Liquid;
 import mindustry.world.blocks.production.GenericCrafter;
 
@@ -23,12 +22,12 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
         super.updateTile();
 
-        // 额外 dump，突破原版 dumpTime 节流
-        if (g != null && items.total() > 0 && block instanceof GenericCrafter gc
-                && gc.outputItems != null) {
-            for (ItemStack out : gc.outputItems) {
+        // 额外 dump，输出群内所有工厂的产物并集，突破原版 dumpTime 节流
+        if (g != null && items.total() > 0) {
+            for (Item item : g.getSharedOutputs()) {
+                if (items.get(item) <= 0) continue;
                 for (int i = 0; i < 8; i++) {
-                    if (!dump(out.item)) break;
+                    if (!dump(item)) break;
                 }
             }
         }
@@ -60,6 +59,64 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
                 && liquids.get(liquid) < block.liquidCapacity * g.members.size;
         }
         return super.acceptLiquid(source, liquid);
+    }
+
+    /** 覆盖原版 dump(Item)：跳过同群建筑，避免无意义的共享池加减 */
+    @Override
+    public boolean dump(Item item) {
+        if (!block.hasItems || items == null || items.total() == 0 || proximity.size == 0) return false;
+        if (item != null && !items.has(item)) return false;
+
+        FactoryGroup myG = GroupManager.getGroup(this);
+        int dump = this.cdump;
+
+        var allItems = mindustry.Vars.content.items();
+        int itemSize = allItems.size;
+        Object[] itemArray = allItems.items;
+
+        if (item == null) {
+            for (int i = 0; i < proximity.size; i++) {
+                Building other = proximity.get((i + dump) % proximity.size);
+                FactoryGroup otherG = GroupManager.getGroup(other);
+
+                // 同群跳过
+                if (myG != null && otherG == myG) {
+                    incrementDump(proximity.size);
+                    continue;
+                }
+
+                for (int ii = 0; ii < itemSize; ii++) {
+                    if (!items.has(ii)) continue;
+                    Item it = (Item) itemArray[ii];
+                    if (other.acceptItem(this, it) && canDump(other, it)) {
+                        other.handleItem(this, it);
+                        items.remove(it, 1);
+                        incrementDump(proximity.size);
+                        return true;
+                    }
+                }
+                incrementDump(proximity.size);
+            }
+        } else {
+            for (int i = 0; i < proximity.size; i++) {
+                Building other = proximity.get((i + dump) % proximity.size);
+                FactoryGroup otherG = GroupManager.getGroup(other);
+
+                if (myG != null && otherG == myG) {
+                    incrementDump(proximity.size);
+                    continue;
+                }
+
+                if (other.acceptItem(this, item) && canDump(other, item)) {
+                    other.handleItem(this, item);
+                    items.remove(item, 1);
+                    incrementDump(proximity.size);
+                    return true;
+                }
+                incrementDump(proximity.size);
+            }
+        }
+        return false;
     }
 
     @Override
