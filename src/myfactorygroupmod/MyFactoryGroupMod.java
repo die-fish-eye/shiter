@@ -123,6 +123,21 @@ if (b instanceof mindustry.world.blocks.power.VariableReactor vr) {
     continue;
 }
 
+// NuclearReactor
+if (b instanceof mindustry.world.blocks.power.NuclearReactor nr) {
+    try {
+        Building test = b.buildType.get();
+        if (test.getClass().getName().endsWith("$NuclearReactorBuild")) {
+            b.buildType = () -> new GroupNuclearReactorBuild(nr);
+            patched++;
+            Log.info("[fgm] 已替换 NuclearReactor: @", b.name);
+        }
+    } catch (Throwable t) {
+        Log.warn("[fgm] 检查 @ 时出错: @", b.name, t.getMessage());
+    }
+    continue;
+}
+
 // ConsumeGenerator（HeaterGenerator 已在上面处理）
 if (b instanceof mindustry.world.blocks.power.ConsumeGenerator gen) {
     try {
