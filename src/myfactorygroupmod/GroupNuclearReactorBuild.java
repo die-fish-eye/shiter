@@ -5,7 +5,9 @@ import arc.math.Mathf;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.Time;
+import java.lang.reflect.Field;
 import mindustry.Vars;
+import mindustry.content.Fx;
 import mindustry.game.EventType.Trigger;
 import mindustry.gen.Building;
 import mindustry.type.Item;
@@ -13,11 +15,31 @@ import mindustry.world.blocks.power.NuclearReactor;
 
 public class GroupNuclearReactorBuild extends NuclearReactor.NuclearReactorBuild {
 
-    /** 本地声明一份，避免依赖父类字段（MindustryX 运行时可能不存在） */
     public float localHeatLastFrame;
 
     public GroupNuclearReactorBuild(NuclearReactor reactor) {
         reactor.super();
+    }
+
+    /** 反射读字段，读不到就用 default 值 */
+    private static float f(Object obj, Class<?> cls, String name, float def) {
+        try {
+            Field field = cls.getField(name);
+            field.setAccessible(true);
+            return field.getFloat(obj);
+        } catch (Throwable t) {
+            return def;
+        }
+    }
+
+    private static Object o(Object obj, Class<?> cls, String name) {
+        try {
+            Field field = cls.getField(name);
+            field.setAccessible(true);
+            return field.get(obj);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     @Override
@@ -32,44 +54,59 @@ public class GroupNuclearReactorBuild extends NuclearReactor.NuclearReactorBuild
 
         NuclearReactor nr = (NuclearReactor) block;
 
+        // 反射读字段，MindustryX 可能改名/删除某些字段
+        Object fuelItemObj = o(nr, NuclearReactor.class, "fuelItem");
+        Item fuelItem = fuelItemObj instanceof Item it ? it : mindustry.content.Items.thorium;
+
+        float heating = f(nr, NuclearReactor.class, "heating", 0.01f);
+        float heatConsumeRate = f(nr, NuclearReactor.class, "heatConsumeRate", 10f);
+        float ambientCooldownTime = f(nr, NuclearReactor.class, "ambientCooldownTime", 60f * 20f);
+        float coolantPower = f(nr, NuclearReactor.class, "coolantPower", 0.5f);
+        float smokeThreshold = f(nr, NuclearReactor.class, "smokeThreshold", 0.3f);
+        float heatOutput = f(nr, NuclearReactor.class, "heatOutput", 12f);
+        float heatWarmupRate = f(nr, NuclearReactor.class, "heatWarmupRate", 1f);
+
+        float itemDuration = f(nr, NuclearReactor.class, "itemDuration", 120f);
+        int timerFuel = (int) f(nr, NuclearReactor.class, "timerFuel", 0f);
+
         int cap = block.itemCapacity * g.members.size;
-        int fuel = items.get(nr.fuelItem);
+        int fuel = items.get(fuelItem);
         float fullness = Mathf.clamp((float) fuel / cap);
         productionEfficiency = fullness;
 
         if (fuel > 0 && enabled) {
-            localHeatLastFrame = fullness * nr.heating * Math.min(delta(), 4f);
+            localHeatLastFrame = fullness * heating * Math.min(delta(), 4f);
             heat += localHeatLastFrame;
 
-            if (timer(nr.timerFuel, nr.itemDuration
-                    / (timeScale + (heat > localHeatLastFrame ? 1f * heat * nr.heatConsumeRate : 0f)))) {
+            if (timer(timerFuel, itemDuration
+                    / (timeScale + (heat > localHeatLastFrame ? 1f * heat * heatConsumeRate : 0f)))) {
                 consume();
             }
         } else {
             productionEfficiency = 0f;
-            heat = Math.max(0f, heat - Time.delta / nr.ambientCooldownTime);
+            heat = Math.max(0f, heat - Time.delta / ambientCooldownTime);
         }
 
         if (heat > 0) {
-            float maxUsed = Math.min(liquids.currentAmount(), heat / nr.coolantPower);
-            heat -= maxUsed * nr.coolantPower;
+            float maxUsed = Math.min(liquids.currentAmount(), heat / coolantPower);
+            heat -= maxUsed * coolantPower;
             liquids.remove(liquids.current(), maxUsed);
         }
 
-        if (heat > nr.smokeThreshold) {
-            float smoke = 1.0f + (heat - nr.smokeThreshold) / (1f - nr.smokeThreshold);
+        if (heat > smokeThreshold) {
+            float smoke = 1.0f + (heat - smokeThreshold) / (1f - smokeThreshold);
             if (Mathf.chance(smoke / 20.0 * delta())) {
-                mindustry.content.Fx.reactorsmoke.at(
+                Fx.reactorsmoke.at(
                     x + Mathf.range(block.size * Vars.tilesize / 2f),
                     y + Mathf.range(block.size * Vars.tilesize / 2f));
             }
         }
 
         heat = Mathf.clamp(heat);
-        heatProgress = nr.heatOutput > 0f
+        heatProgress = heatOutput > 0f
             ? Mathf.approachDelta(heatProgress,
-                heat * nr.heatOutput * ((enabled && productionEfficiency > 0) ? 1f : 0f),
-                nr.heatWarmupRate * delta())
+                heat * heatOutput * ((enabled && productionEfficiency > 0) ? 1f : 0f),
+                heatWarmupRate * delta())
             : 0f;
 
         if (heat >= 0.999f) {
