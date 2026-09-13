@@ -43,16 +43,15 @@ public class MyFactoryGroupMod extends Mod {
         }, 0.5f, 0.5f);
     }
 
-    /** 把原版工厂方块的 buildType 替换为 GroupCrafterBuild */
     private void patchFactoryBuilds() {
     int patched = 0;
     for (Block b : Vars.content.blocks()) {
-        // 先处理 Separator（它不继承 GenericCrafter，但为了保险还是先判）
+        // Separator
         if (b instanceof mindustry.world.blocks.production.Separator sep) {
             try {
                 Building test = b.buildType.get();
-                String cls = test.getClass().getName();
-                if (cls.equals("mindustry.world.blocks.production.Separator$SeparatorBuild")) {
+                if (test.getClass().getName().equals(
+                        "mindustry.world.blocks.production.Separator$SeparatorBuild")) {
                     b.buildType = () -> new GroupSeparatorBuild(sep);
                     patched++;
                     Log.info("[fgm] 已替换 Separator: @", b.name);
@@ -63,11 +62,28 @@ public class MyFactoryGroupMod extends Mod {
             continue;
         }
 
+        // Drill（包括 Drill 的所有子类：PneumaticDrill、LaserDrill、BlastDrill 等）
+        if (b instanceof mindustry.world.blocks.production.Drill drill) {
+            try {
+                Building test = b.buildType.get();
+                String cls = test.getClass().getName();
+                if (cls.endsWith("$DrillBuild")) {
+                    b.buildType = () -> new GroupDrillBuild(drill);
+                    patched++;
+                    Log.info("[fgm] 已替换 Drill: @", b.name);
+                }
+            } catch (Throwable t) {
+                Log.warn("[fgm] 检查 @ 时出错: @", b.name, t.getMessage());
+            }
+            continue;
+        }
+
+        // GenericCrafter
         if (!(b instanceof GenericCrafter gc)) continue;
         try {
             Building test = b.buildType.get();
-            String cls = test.getClass().getName();
-            if (cls.equals("mindustry.world.blocks.production.GenericCrafter$GenericCrafterBuild")) {
+            if (test.getClass().getName().equals(
+                    "mindustry.world.blocks.production.GenericCrafter$GenericCrafterBuild")) {
                 b.buildType = () -> new GroupCrafterBuild(gc);
                 patched++;
                 Log.info("[fgm] 已替换: @", b.name);
@@ -77,5 +93,5 @@ public class MyFactoryGroupMod extends Mod {
         }
     }
     Log.info("[fgm] 共替换 @ 个工厂方块", patched);
- }
+}
 }

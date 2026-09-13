@@ -17,7 +17,9 @@ public class GroupManager {
     }
 
     public static boolean isFactory(Building b) {
-    return b instanceof GroupCrafterBuild || b instanceof GroupSeparatorBuild;
+    return b instanceof GroupCrafterBuild
+        || b instanceof GroupSeparatorBuild
+        || b instanceof GroupDrillBuild;
 }
 
     private static void applyShared(Building b, FactoryGroup group) {

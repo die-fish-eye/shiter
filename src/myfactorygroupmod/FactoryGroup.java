@@ -69,20 +69,20 @@ public class FactoryGroup {
         cachedOutputs = outs;
         cachedOutputsMemberCount = members.size;
     }
-    return cachedOutputs;
-}
 
-    public void absorbItems(FactoryGroup other) {
-        for (Item item : Vars.content.items()) {
-            int amount = other.sharedItems.get(item);
-            if (amount > 0) sharedItems.add(item, amount);
+    // 钻头的 dominantItem 是动态的，每次重新收集
+    Set<Item> drills = new HashSet<>();
+    for (Building b : members) {
+        if (b instanceof mindustry.world.blocks.production.Drill.DrillBuild db
+                && db.dominantItem != null) {
+            drills.add(db.dominantItem);
         }
     }
 
-    public void absorbLiquids(FactoryGroup other) {
-        for (Liquid liquid : Vars.content.liquids()) {
-            float amount = other.sharedLiquids.get(liquid);
-            if (amount > 0) sharedLiquids.add(liquid, amount);
-        }
-    }
+    if (drills.isEmpty()) return cachedOutputs;
+    if (cachedOutputs.containsAll(drills)) return cachedOutputs;
+
+    Set<Item> combined = new HashSet<>(cachedOutputs);
+    combined.addAll(drills);
+    return combined;
 }
