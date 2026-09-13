@@ -1,17 +1,13 @@
 package myfactorygroupmod;
 
-import arc.graphics.Color;
 import arc.scene.ui.layout.Table;
 import mindustry.Vars;
 import mindustry.gen.Building;
 import mindustry.type.Item;
 import mindustry.type.Liquid;
-import mindustry.ui.Bar;
 import mindustry.world.blocks.production.GenericCrafter;
 
 public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
-
-    private Bar liquidBar;
 
     public GroupCrafterBuild(GenericCrafter crafter) {
         crafter.super();
@@ -28,9 +24,7 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         }
 
         if (g != null && g.members.size > 1 && items.total() > 0) {
-            for (int i = 0; i < 3; i++) {
-                if (!dump()) break;
-            }
+            dump();
         }
     }
 
@@ -62,17 +56,24 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return super.acceptLiquid(source, liquid);
     }
 
+    /** 只向"非同群"的建筑输出物品，避免同群互相喂导致增殖 */
     @Override
     public boolean dump() {
         if (items.total() <= 0) return false;
 
+        FactoryGroup myGroup = GroupManager.getGroup(this);
         boolean dumped = false;
+
         for (int i = 0; i < Vars.content.items().size; i++) {
             Item item = Vars.content.item(i);
             if (items.get(item) <= 0) continue;
 
             for (Building b : proximity) {
                 if (b == this) continue;
+
+                FactoryGroup otherGroup = GroupManager.getGroup(b);
+                if (myGroup != null && otherGroup == myGroup) continue;
+
                 if (b.acceptItem(this, item)) {
                     b.handleItem(this, item);
                     offload(item);
@@ -93,25 +94,12 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
         table.row();
         table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
-        table.add("[lightgray]成员: []" + group.members.size
-            + "   [lightgray]组成: []" + group.getCompositionString()).left().row();
+        table.add("[lightgray]成员: []" + group.members.size).left().row();
 
-        if (block.hasLiquids) {
-            if (liquidBar == null) {
-                liquidBar = new Bar(
-                    () -> "[lightgray]共享液体[]",
-                    () -> Color.royal,
-                    () -> {
-                        FactoryGroup g = GroupManager.getGroup(this);
-                        if (g == null) return 0f;
-                        float cap = block.liquidCapacity * g.members.size;
-                        return cap > 0
-                            ? Math.min(1f, g.sharedLiquids.currentAmount() / cap)
-                            : 0f;
-                    }
-                );
-            }
-            table.add(liquidBar).width(200f).height(20f).padTop(4f).row();
-        }
+        // 种类统计，允许换行
+        arc.scene.ui.Label comp = new arc.scene.ui.Label(
+            "[lightgray]组成: []" + group.getCompositionString());
+        comp.setWrap(true);
+        table.add(comp).left().width(220f).row();
     }
 }
