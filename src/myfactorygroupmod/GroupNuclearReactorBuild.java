@@ -1,9 +1,12 @@
 package myfactorygroupmod;
 
+import arc.Events;
+import arc.math.Mathf;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import arc.util.Time;
-import arc.math.Mathf;
+import mindustry.Vars;
+import mindustry.game.EventType.Trigger;
 import mindustry.gen.Building;
 import mindustry.type.Item;
 import mindustry.world.blocks.power.NuclearReactor;
@@ -24,47 +27,50 @@ public class GroupNuclearReactorBuild extends NuclearReactor.NuclearReactorBuild
             return;
         }
 
+        NuclearReactor nr = (NuclearReactor) block;
+
         // 用群总容量作为基准，避免共享池钍太多导致 fullness > 1
         int cap = block.itemCapacity * g.members.size;
-        int fuel = items.get(fuelItem);
+        int fuel = items.get(nr.fuelItem);
         float fullness = Mathf.clamp((float) fuel / cap);
         productionEfficiency = fullness;
 
         if (fuel > 0 && enabled) {
-            heat += heatLastFrame = fullness * heating * Math.min(delta(), 4f);
+            heat += heatLastFrame = fullness * nr.heating * Math.min(delta(), 4f);
 
-            if (timer(timerFuel, itemDuration / (timeScale + (heat > heatLastFrame ? 1f * heat * heatConsumeRate : 0f)))) {
+            if (timer(nr.timerFuel, nr.itemDuration
+                    / (timeScale + (heat > heatLastFrame ? 1f * heat * nr.heatConsumeRate : 0f)))) {
                 consume();
             }
         } else {
             productionEfficiency = 0f;
-            heat = Math.max(0f, heat - Time.delta / ambientCooldownTime);
+            heat = Math.max(0f, heat - Time.delta / nr.ambientCooldownTime);
         }
 
         if (heat > 0) {
-            float maxUsed = Math.min(liquids.currentAmount(), heat / coolantPower);
-            heat -= maxUsed * coolantPower;
+            float maxUsed = Math.min(liquids.currentAmount(), heat / nr.coolantPower);
+            heat -= maxUsed * nr.coolantPower;
             liquids.remove(liquids.current(), maxUsed);
         }
 
-        if (heat > smokeThreshold) {
-            float smoke = 1.0f + (heat - smokeThreshold) / (1f - smokeThreshold);
+        if (heat > nr.smokeThreshold) {
+            float smoke = 1.0f + (heat - nr.smokeThreshold) / (1f - nr.smokeThreshold);
             if (Mathf.chance(smoke / 20.0 * delta())) {
                 mindustry.content.Fx.reactorsmoke.at(
-                    x + Mathf.range(size * mindustry.Vars.tilesize / 2f),
-                    y + Mathf.range(size * mindustry.Vars.tilesize / 2f));
+                    x + Mathf.range(block.size * Vars.tilesize / 2f),
+                    y + Mathf.range(block.size * Vars.tilesize / 2f));
             }
         }
 
         heat = Mathf.clamp(heat);
-        heatProgress = heatOutput > 0f
+        heatProgress = nr.heatOutput > 0f
             ? Mathf.approachDelta(heatProgress,
-                heat * heatOutput * ((enabled && productionEfficiency > 0) ? 1f : 0f),
-                heatWarmupRate * delta())
+                heat * nr.heatOutput * ((enabled && productionEfficiency > 0) ? 1f : 0f),
+                nr.heatWarmupRate * delta())
             : 0f;
 
         if (heat >= 0.999f) {
-            mindustry.game.EventType.Trigger.thoriumReactorOverheat.fire();
+            Events.fire(Trigger.thoriumReactorOverheat);
             kill();
         }
     }
