@@ -20,13 +20,17 @@ public class GroupManager {
         return b instanceof GroupCrafterBuild;
     }
 
-    /** 关键：让建筑的 items/liquids 直接指向群的共享对象 */
     private static void applyShared(Building b, FactoryGroup group) {
-        if (b.items != group.sharedItems) {
-            b.items = group.sharedItems;
-        }
+        if (b.items != group.sharedItems) b.items = group.sharedItems;
         if (b.block.hasLiquids && b.liquids != group.sharedLiquids) {
             b.liquids = group.sharedLiquids;
+        }
+    }
+
+    /** 重建群内所有成员的电力图 */
+    private static void refreshPower(FactoryGroup group) {
+        for (Building b : group.members) {
+            if (b.power != null) b.updatePowerGraph();
         }
     }
 
@@ -133,6 +137,9 @@ public class GroupManager {
             buildingToGroup.put(b, targetGroup);
             applyShared(b, targetGroup);
         }
+
+        // 群结构变化，刷新电力
+        refreshPower(targetGroup);
     }
 
     public static void onBuildingRemoved(Building building) {
@@ -153,13 +160,19 @@ public class GroupManager {
         }
         group.members.clear();
 
+        ObjectSet<FactoryGroup> newGroups = new ObjectSet<>();
         for (Building b : allMembers) {
             if (buildingToGroup.containsKey(b)) continue;
-            bfsAssign(b, allMembers);
+            newGroups.add(bfsAssign(b, allMembers));
+        }
+
+        // 所有新分裂的群，刷新电力
+        for (FactoryGroup g : newGroups) {
+            refreshPower(g);
         }
     }
 
-    private static void bfsAssign(Building start, ObjectSet<Building> candidates) {
+    private static FactoryGroup bfsAssign(Building start, ObjectSet<Building> candidates) {
         FactoryGroup newGroup = new FactoryGroup();
         Queue<Building> queue = new Queue<>();
         ObjectSet<Building> visited = new ObjectSet<>();
@@ -194,5 +207,6 @@ public class GroupManager {
                 }
             }
         }
+        return newGroup;
     }
 }

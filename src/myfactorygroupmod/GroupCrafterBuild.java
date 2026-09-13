@@ -1,6 +1,7 @@
 package myfactorygroupmod;
 
 import arc.scene.ui.layout.Table;
+import arc.struct.Seq;
 import mindustry.gen.Building;
 import mindustry.type.Item;
 import mindustry.type.Liquid;
@@ -12,6 +13,26 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         crafter.super();
     }
 
+    // ===== 电力共享：群内成员互相视为连接 =====
+
+    @Override
+    public Seq<Building> getPowerConnections(Seq<Building> out) {
+        super.getPowerConnections(out);
+        if (power == null) return out;
+
+        FactoryGroup g = GroupManager.getGroup(this);
+        if (g != null) {
+            for (Building b : g.members) {
+                if (b != this && b.power != null && !out.contains(b)) {
+                    out.add(b);
+                }
+            }
+        }
+        return out;
+    }
+
+    // ===== 每帧强制 items/liquids 指向共享池 =====
+
     @Override
     public void updateTile() {
         FactoryGroup g = GroupManager.getGroup(this);
@@ -22,7 +43,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
         super.updateTile();
 
-        // 额外 dump，输出群内所有工厂的产物并集，突破原版 dumpTime 节流
         if (g != null && items.total() > 0) {
             for (Item item : g.getSharedOutputs()) {
                 if (items.get(item) <= 0) continue;
@@ -61,7 +81,7 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return super.acceptLiquid(source, liquid);
     }
 
-    /** 覆盖原版 dump(Item)：跳过同群建筑，避免无意义的共享池加减 */
+    /** 跳过同群建筑的 dump */
     @Override
     public boolean dump(Item item) {
         if (!block.hasItems || items == null || items.total() == 0 || proximity.size == 0) return false;
@@ -78,8 +98,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
             for (int i = 0; i < proximity.size; i++) {
                 Building other = proximity.get((i + dump) % proximity.size);
                 FactoryGroup otherG = GroupManager.getGroup(other);
-
-                // 同群跳过
                 if (myG != null && otherG == myG) {
                     incrementDump(proximity.size);
                     continue;
@@ -101,7 +119,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
             for (int i = 0; i < proximity.size; i++) {
                 Building other = proximity.get((i + dump) % proximity.size);
                 FactoryGroup otherG = GroupManager.getGroup(other);
-
                 if (myG != null && otherG == myG) {
                     incrementDump(proximity.size);
                     continue;
