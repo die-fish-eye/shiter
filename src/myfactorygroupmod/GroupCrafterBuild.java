@@ -15,7 +15,31 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         crafter.super();
     }
 
-    // ===== 物品接收：同群一律接收 =====
+    // ===== 每帧自检 + 主动输出 =====
+
+    @Override
+    public void updateTile() {
+        super.updateTile();
+
+        // 保险：确认 items 指向共享池
+        FactoryGroup g = GroupManager.getGroup(this);
+        if (g != null && items != g.sharedItems) {
+            items = g.sharedItems;
+        }
+        if (g != null && block.hasLiquids && liquids != g.sharedLiquids) {
+            liquids = g.sharedLiquids;
+        }
+
+        // 主动 dump，绕开原版 dumpTime 节流
+        if (g != null && g.members.size > 1 && items.total() > 0) {
+            for (int i = 0; i < 3; i++) {
+                if (!dump()) break;
+            }
+        }
+    }
+
+    // ===== 物品接收 =====
+
     @Override
     public boolean acceptItem(Building source, Item item) {
         FactoryGroup myGroup = GroupManager.getGroup(this);
@@ -34,6 +58,7 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
     }
 
     // ===== 液体接收 =====
+
     @Override
     public boolean acceptLiquid(Building source, Liquid liquid) {
         FactoryGroup myGroup = GroupManager.getGroup(this);
@@ -45,60 +70,58 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return super.acceptLiquid(source, liquid);
     }
 
+    // ===== 重写 dump：一帧内尝试所有物品 =====
+
     @Override
     public boolean dump() {
-    if (items.total() <= 0) return false;
+        if (items.total() <= 0) return false;
 
-    boolean dumped = false;
-    for (int i = 0; i < Vars.content.items().size; i++) {
-        Item item = Vars.content.item(i);
-        if (items.get(item) <= 0) continue;
+        boolean dumped = false;
+        for (int i = 0; i < Vars.content.items().size; i++) {
+            Item item = Vars.content.item(i);
+            if (items.get(item) <= 0) continue;
 
-        for (Building b : proximity) {
-            if (b == this) continue;
-            if (b.acceptItem(this, item)) {
-                b.handleItem(this, item);
-                offload(item);
-                dumped = true;
-                break;
-            }
-        }
-    }
-    return dumped;
-}
-
-    // ===== UI =====
-    @Override
-    public void display(Table table) {
-        super.display(table);
-
-        FactoryGroup group = GroupManager.getGroup(this);
-        if (group == null || group.members.size <= 1) return;
-
-        table.row();
-        table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
-        table.add("[lightgray]成员: []" + group.members.size
-            + "   [lightgray]组成: []" + group.getCompositionString()).left().row();
-
-        // 液体共享条
-        if (block.hasLiquids) {
-            float cap = block.liquidCapacity * group.members.size;
-            if (cap > 0) {
-                table.add(new Bar(
-                    () -> "[lightgray]共享液体[]",
-                    () -> Color.royal,
-                    () -> Math.min(1f, group.sharedLiquids.currentAmount() / cap)
-                )).width(200f).height(20f).padTop(4f).row();
-
-                for (Liquid liquid : Vars.content.liquids()) {
-                    float amount = group.sharedLiquids.get(liquid);
-                    if (amount > 0) {
-                        table.image(liquid.uiIcon).size(20f).padRight(4f);
-                        table.add(liquid.localizedName + ": " + (int) amount)
-                             .left().row();
-                    }
+            for (Building b : proximity) {
+                if (b == this) continue;
+                if (b.acceptItem(this, item)) {
+                    b.handleItem(this, item);
+                    offload(item);
+                    dumped = true;
+                    break;
                 }
             }
         }
+        return dumped;
+    }
+
+    // ===== UI =====
+
+private Bar liquidBar;
+
+@Override
+public void display(Table table) {
+    super.display(table);
+    FactoryGroup group = GroupManager.getGroup(this);
+    if (group == null || group.members.size <= 1) return;
+
+    table.row();
+    table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
+    table.add("[lightgray]成员: []" + group.members.size
+        + "   [lightgray]组成: []" + group.getCompositionString()).left().row();
+
+    if (block.hasLiquids) {
+        if (liquidBar == null) {
+            liquidBar = new Bar(
+                () -> "[lightgray]共享液体[]",
+                () -> Color.royal,
+                () -> {
+                    FactoryGroup g = GroupManager.getGroup(this);
+                    if (g == null) return 0f;
+                    float cap = block.liquidCapacity * g.members.size;
+                    return cap > 0 ? Math.min(1f, g.sharedLiquids.currentAmount() / cap) : 0f;
+                }
+            );
+        }
+        table.add(liquidBar).width(200f).height(20f).padTop(4f).row();
     }
 }
