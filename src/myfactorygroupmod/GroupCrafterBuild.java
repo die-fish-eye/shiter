@@ -1,9 +1,12 @@
 package myfactorygroupmod;
 
+import arc.graphics.Color;
 import arc.scene.ui.layout.Table;
+import mindustry.Vars;
 import mindustry.gen.Building;
 import mindustry.type.Item;
 import mindustry.type.Liquid;
+import mindustry.ui.Bar;
 import mindustry.world.blocks.production.GenericCrafter;
 
 public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
@@ -12,6 +15,7 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         crafter.super();
     }
 
+    // ===== 物品接收：同群一律接收 =====
     @Override
     public boolean acceptItem(Building source, Item item) {
         FactoryGroup myGroup = GroupManager.getGroup(this);
@@ -29,6 +33,7 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return block.itemCapacity * g.members.size;
     }
 
+    // ===== 液体接收 =====
     @Override
     public boolean acceptLiquid(Building source, Liquid liquid) {
         FactoryGroup myGroup = GroupManager.getGroup(this);
@@ -40,6 +45,29 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return super.acceptLiquid(source, liquid);
     }
 
+    // ===== dump：一帧内把所有物品都尝试扔出去，不再 return =====
+    @Override
+    public void dump() {
+        if (items.total() <= 0) return;
+
+        for (int i = 0; i < Vars.content.items().size; i++) {
+            Item item = Vars.content.item(i);
+            if (items.get(item) <= 0) continue;
+            if (!canDump(item)) continue;
+
+            for (Building b : proximity) {
+                if (b.acceptItem(this, item)) {
+                    int removed = offload(item);
+                    if (removed > 0) {
+                        b.handleItem(this, item);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== UI =====
     @Override
     public void display(Table table) {
         super.display(table);
@@ -49,39 +77,26 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
         table.row();
         table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
-        table.add("[lightgray]成员总数: []" + group.members.size).left().row();
+        table.add("[lightgray]成员: []" + group.members.size
+            + "   [lightgray]组成: []" + group.getCompositionString()).left().row();
 
-        // 工厂种类（用缓存，避免每帧重建）
-        table.add(group.getCompositionString()).left().row();
+        // 液体共享条
+        if (block.hasLiquids) {
+            float cap = block.liquidCapacity * group.members.size;
+            if (cap > 0) {
+                table.add(new Bar(
+                    () -> "[lightgray]共享液体[]",
+                    () -> Color.royal,
+                    () -> Math.min(1f, group.sharedLiquids.currentAmount() / cap)
+                )).width(200f).height(20f).padTop(4f).row();
 
-        // 共享物品
-        boolean hasItem = false;
-        for (Item item : mindustry.Vars.content.items()) {
-            if (group.sharedItems.get(item) > 0) { hasItem = true; break; }
-        }
-        if (hasItem) {
-            table.add("[accent]共享物品[]").left().padTop(4f).row();
-            for (Item item : mindustry.Vars.content.items()) {
-                int amount = group.sharedItems.get(item);
-                if (amount > 0) {
-                    table.image(item.uiIcon).size(20f).padRight(6f);
-                    table.add(item.localizedName + ": " + amount).left().row();
-                }
-            }
-        }
-
-        // 共享液体
-        boolean hasLiquid = false;
-        for (Liquid liquid : mindustry.Vars.content.liquids()) {
-            if (group.sharedLiquids.get(liquid) > 0) { hasLiquid = true; break; }
-        }
-        if (hasLiquid) {
-            table.add("[accent]共享液体[]").left().padTop(4f).row();
-            for (Liquid liquid : mindustry.Vars.content.liquids()) {
-                float amount = group.sharedLiquids.get(liquid);
-                if (amount > 0) {
-                    table.image(liquid.uiIcon).size(20f).padRight(6f);
-                    table.add(liquid.localizedName + ": " + (int) amount).left().row();
+                for (Liquid liquid : Vars.content.liquids()) {
+                    float amount = group.sharedLiquids.get(liquid);
+                    if (amount > 0) {
+                        table.image(liquid.uiIcon).size(20f).padRight(4f);
+                        table.add(liquid.localizedName + ": " + (int) amount)
+                             .left().row();
+                    }
                 }
             }
         }
