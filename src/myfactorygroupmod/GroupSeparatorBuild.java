@@ -7,6 +7,8 @@ import mindustry.type.Item;
 import mindustry.type.ItemStack;
 import mindustry.type.Liquid;
 import mindustry.world.blocks.production.Separator;
+import mindustry.world.consumers.Consume;
+import mindustry.world.consumers.ConsumeItems;
 
 public class GroupSeparatorBuild extends Separator.SeparatorBuild {
 
@@ -26,11 +28,16 @@ public class GroupSeparatorBuild extends Separator.SeparatorBuild {
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null || g.members.size <= 0) return super.shouldConsume();
 
-        int cap = itemCapacity * g.members.size;
+        int cap = block.itemCapacity * g.members.size;
         int total = items.total();
-        if (consItems != null) {
-            for (ItemStack stack : consItems.items) {
-                total -= items.get(stack.item);
+
+        // 找出 ConsumeItems，减去它消耗掉的物品
+        for (Consume c : block.consumers) {
+            if (c instanceof ConsumeItems ci) {
+                for (ItemStack stack : ci.items) {
+                    total -= items.get(stack.item);
+                }
+                break;
             }
         }
         return total < cap && enabled;
