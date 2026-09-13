@@ -11,34 +11,28 @@ import mindustry.world.blocks.production.GenericCrafter;
 
 public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
+    private Bar liquidBar;
+
     public GroupCrafterBuild(GenericCrafter crafter) {
         crafter.super();
     }
-
-    // ===== 每帧自检 + 主动输出 =====
 
     @Override
     public void updateTile() {
         super.updateTile();
 
-        // 保险：确认 items 指向共享池
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g != null && items != g.sharedItems) {
-            items = g.sharedItems;
-        }
-        if (g != null && block.hasLiquids && liquids != g.sharedLiquids) {
-            liquids = g.sharedLiquids;
+        if (g != null) {
+            if (items != g.sharedItems) items = g.sharedItems;
+            if (block.hasLiquids && liquids != g.sharedLiquids) liquids = g.sharedLiquids;
         }
 
-        // 主动 dump，绕开原版 dumpTime 节流
         if (g != null && g.members.size > 1 && items.total() > 0) {
             for (int i = 0; i < 3; i++) {
                 if (!dump()) break;
             }
         }
     }
-
-    // ===== 物品接收 =====
 
     @Override
     public boolean acceptItem(Building source, Item item) {
@@ -57,8 +51,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return block.itemCapacity * g.members.size;
     }
 
-    // ===== 液体接收 =====
-
     @Override
     public boolean acceptLiquid(Building source, Liquid liquid) {
         FactoryGroup myGroup = GroupManager.getGroup(this);
@@ -69,8 +61,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         }
         return super.acceptLiquid(source, liquid);
     }
-
-    // ===== 重写 dump：一帧内尝试所有物品 =====
 
     @Override
     public boolean dump() {
@@ -94,34 +84,34 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         return dumped;
     }
 
-    // ===== UI =====
+    @Override
+    public void display(Table table) {
+        super.display(table);
 
-private Bar liquidBar;
+        FactoryGroup group = GroupManager.getGroup(this);
+        if (group == null || group.members.size <= 1) return;
 
-@Override
-public void display(Table table) {
-    super.display(table);
-    FactoryGroup group = GroupManager.getGroup(this);
-    if (group == null || group.members.size <= 1) return;
+        table.row();
+        table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
+        table.add("[lightgray]成员: []" + group.members.size
+            + "   [lightgray]组成: []" + group.getCompositionString()).left().row();
 
-    table.row();
-    table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
-    table.add("[lightgray]成员: []" + group.members.size
-        + "   [lightgray]组成: []" + group.getCompositionString()).left().row();
-
-    if (block.hasLiquids) {
-        if (liquidBar == null) {
-            liquidBar = new Bar(
-                () -> "[lightgray]共享液体[]",
-                () -> Color.royal,
-                () -> {
-                    FactoryGroup g = GroupManager.getGroup(this);
-                    if (g == null) return 0f;
-                    float cap = block.liquidCapacity * g.members.size;
-                    return cap > 0 ? Math.min(1f, g.sharedLiquids.currentAmount() / cap) : 0f;
-                }
-            );
+        if (block.hasLiquids) {
+            if (liquidBar == null) {
+                liquidBar = new Bar(
+                    () -> "[lightgray]共享液体[]",
+                    () -> Color.royal,
+                    () -> {
+                        FactoryGroup g = GroupManager.getGroup(this);
+                        if (g == null) return 0f;
+                        float cap = block.liquidCapacity * g.members.size;
+                        return cap > 0
+                            ? Math.min(1f, g.sharedLiquids.currentAmount() / cap)
+                            : 0f;
+                    }
+                );
+            }
+            table.add(liquidBar).width(200f).height(20f).padTop(4f).row();
         }
-        table.add(liquidBar).width(200f).height(20f).padTop(4f).row();
     }
 }
