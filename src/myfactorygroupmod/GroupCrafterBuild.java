@@ -1,6 +1,5 @@
 package myfactorygroupmod;
 
-import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import mindustry.gen.Building;
 import mindustry.type.Item;
@@ -16,7 +15,6 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
     @Override
     public void updateTile() {
-        // 每帧强制指向共享池
         FactoryGroup g = GroupManager.getGroup(this);
         if (g != null) {
             items = g.sharedItems;
@@ -25,9 +23,10 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
         super.updateTile();
 
-        // ★ 额外 dump，突破原版 dumpTime 节流
-        if (g != null && outputItems != null && items.total() > 0) {
-            for (ItemStack out : outputItems) {
+        // 额外 dump，突破原版 dumpTime 节流
+        if (g != null && items.total() > 0 && block instanceof GenericCrafter gc
+                && gc.outputItems != null) {
+            for (ItemStack out : gc.outputItems) {
                 for (int i = 0; i < 8; i++) {
                     if (!dump(out.item)) break;
                 }
