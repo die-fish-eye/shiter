@@ -13,6 +13,9 @@ import mindustry.world.blocks.power.NuclearReactor;
 
 public class GroupNuclearReactorBuild extends NuclearReactor.NuclearReactorBuild {
 
+    /** 本地声明一份，避免依赖父类字段（MindustryX 运行时可能不存在） */
+    public float localHeatLastFrame;
+
     public GroupNuclearReactorBuild(NuclearReactor reactor) {
         reactor.super();
     }
@@ -29,17 +32,17 @@ public class GroupNuclearReactorBuild extends NuclearReactor.NuclearReactorBuild
 
         NuclearReactor nr = (NuclearReactor) block;
 
-        // 用群总容量作为基准，避免共享池钍太多导致 fullness > 1
         int cap = block.itemCapacity * g.members.size;
         int fuel = items.get(nr.fuelItem);
         float fullness = Mathf.clamp((float) fuel / cap);
         productionEfficiency = fullness;
 
         if (fuel > 0 && enabled) {
-            heat += heatLastFrame = fullness * nr.heating * Math.min(delta(), 4f);
+            localHeatLastFrame = fullness * nr.heating * Math.min(delta(), 4f);
+            heat += localHeatLastFrame;
 
             if (timer(nr.timerFuel, nr.itemDuration
-                    / (timeScale + (heat > heatLastFrame ? 1f * heat * nr.heatConsumeRate : 0f)))) {
+                    / (timeScale + (heat > localHeatLastFrame ? 1f * heat * nr.heatConsumeRate : 0f)))) {
                 consume();
             }
         } else {
