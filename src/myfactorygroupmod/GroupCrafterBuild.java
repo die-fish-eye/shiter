@@ -16,20 +16,21 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
     // ===== 电力共享：群内成员互相视为连接 =====
 
     @Override
-    public Seq<Building> getPowerConnections(Seq<Building> out) {
-        super.getPowerConnections(out);
-        if (power == null) return out;
+public arc.struct.Seq<Building> getPowerConnections(arc.struct.Seq<Building> out) {
+    super.getPowerConnections(out);
+    if (power == null) return out;
 
-        FactoryGroup g = GroupManager.getGroup(this);
-        if (g != null) {
-            for (Building b : g.members) {
-                if (b != this && b.power != null && !out.contains(b)) {
-                    out.add(b);
-                }
+    FactoryGroup g = GroupManager.getGroup(this);
+    if (g != null) {
+        arc.struct.Seq<Building> snapshot = g.members.toSeq();
+        for (Building b : snapshot) {
+            if (b != this && b.power != null && b.isValid() && !out.contains(b)) {
+                out.add(b);
             }
         }
-        return out;
     }
+    return out;
+}
 
     // ===== 每帧强制 items/liquids 指向共享池 =====
 

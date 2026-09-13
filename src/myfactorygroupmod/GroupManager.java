@@ -28,9 +28,9 @@ public class GroupManager {
     }
 
     /** 重建群内所有成员的电力图 */
-private static void refreshPower(FactoryGroup group) {
+    private static void refreshPower(FactoryGroup group) {
     // 快照，避免嵌套迭代
-    Building[] snapshot = group.members.toArray(Building.class);
+    arc.struct.Seq<Building> snapshot = group.members.toSeq();
     for (Building b : snapshot) {
         if (b != null && b.power != null && b.isValid()) {
             b.updatePowerGraph();
