@@ -4,6 +4,7 @@ import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import mindustry.gen.Building;
 import mindustry.type.Item;
+import mindustry.type.ItemStack;
 import mindustry.type.Liquid;
 import mindustry.world.blocks.production.Separator;
 
@@ -18,6 +19,21 @@ public class GroupSeparatorBuild extends Separator.SeparatorBuild {
         GroupSupport.redirectModules(this);
         super.updateTile();
         GroupSupport.extraDump(this);
+    }
+
+    @Override
+    public boolean shouldConsume(){
+        FactoryGroup g = GroupManager.getGroup(this);
+        if (g == null || g.members.size <= 0) return super.shouldConsume();
+
+        int cap = itemCapacity * g.members.size;
+        int total = items.total();
+        if (consItems != null) {
+            for (ItemStack stack : consItems.items) {
+                total -= items.get(stack.item);
+            }
+        }
+        return total < cap && enabled;
     }
 
     @Override
