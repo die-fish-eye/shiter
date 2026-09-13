@@ -77,6 +77,66 @@ public class MyFactoryGroupMod extends Mod {
             }
             continue;
         }
+        
+        // HeaterGenerator（ConsumeGenerator 子类，先匹配）
+if (b instanceof mindustry.world.blocks.power.HeaterGenerator hg) {
+    try {
+        Building test = b.buildType.get();
+        if (test.getClass().getName().endsWith("$HeaterGeneratorBuild")) {
+            b.buildType = () -> new GroupHeaterGeneratorBuild(hg);
+            patched++;
+            Log.info("[fgm] 已替换 HeaterGenerator: @", b.name);
+        }
+    } catch (Throwable t) {
+        Log.warn("[fgm] 检查 @ 时出错: @", b.name, t.getMessage());
+    }
+    continue;
+}
+
+// ImpactReactor
+if (b instanceof mindustry.world.blocks.power.ImpactReactor ir) {
+    try {
+        Building test = b.buildType.get();
+        if (test.getClass().getName().endsWith("$ImpactReactorBuild")) {
+            b.buildType = () -> new GroupImpactReactorBuild(ir);
+            patched++;
+            Log.info("[fgm] 已替换 ImpactReactor: @", b.name);
+        }
+    } catch (Throwable t) {
+        Log.warn("[fgm] 检查 @ 时出错: @", b.name, t.getMessage());
+    }
+    continue;
+}
+
+// VariableReactor
+if (b instanceof mindustry.world.blocks.power.VariableReactor vr) {
+    try {
+        Building test = b.buildType.get();
+        if (test.getClass().getName().endsWith("$VariableReactorBuild")) {
+            b.buildType = () -> new GroupVariableReactorBuild(vr);
+            patched++;
+            Log.info("[fgm] 已替换 VariableReactor: @", b.name);
+        }
+    } catch (Throwable t) {
+        Log.warn("[fgm] 检查 @ 时出错: @", b.name, t.getMessage());
+    }
+    continue;
+}
+
+// ConsumeGenerator（HeaterGenerator 已在上面处理）
+if (b instanceof mindustry.world.blocks.power.ConsumeGenerator gen) {
+    try {
+        Building test = b.buildType.get();
+        if (test.getClass().getName().endsWith("$ConsumeGeneratorBuild")) {
+            b.buildType = () -> new GroupConsumeGeneratorBuild(gen);
+            patched++;
+            Log.info("[fgm] 已替换 ConsumeGenerator: @", b.name);
+        }
+    } catch (Throwable t) {
+        Log.warn("[fgm] 检查 @ 时出错: @", b.name, t.getMessage());
+    }
+    continue;
+}
 
         // GenericCrafter
         if (!(b instanceof GenericCrafter gc)) continue;
