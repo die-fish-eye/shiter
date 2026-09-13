@@ -4,6 +4,7 @@ import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
 import mindustry.gen.Building;
 import mindustry.type.Item;
+import mindustry.type.ItemStack;
 import mindustry.type.Liquid;
 import mindustry.world.blocks.production.GenericCrafter;
 
@@ -15,21 +16,30 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
     @Override
     public void updateTile() {
-        // ★ 每帧强制 items/liquids 指向共享池
-        //   原版 create() 会重置 items 为新的本地模块，导致 dump 时"加共享池、减本地"
+        // 每帧强制指向共享池
         FactoryGroup g = GroupManager.getGroup(this);
         if (g != null) {
             items = g.sharedItems;
             if (block.hasLiquids) liquids = g.sharedLiquids;
         }
+
         super.updateTile();
+
+        // ★ 额外 dump，突破原版 dumpTime 节流
+        if (g != null && outputItems != null && items.total() > 0) {
+            for (ItemStack out : outputItems) {
+                for (int i = 0; i < 8; i++) {
+                    if (!dump(out.item)) break;
+                }
+            }
+        }
     }
 
     @Override
     public boolean acceptItem(Building source, Item item) {
         FactoryGroup g = GroupManager.getGroup(this);
         if (g != null) {
-            items = g.sharedItems;  // 同样强制指向
+            items = g.sharedItems;
             return items.get(item) < getMaximumAccepted(item);
         }
         return super.acceptItem(source, item);
@@ -63,9 +73,5 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
         table.row();
         table.add("[accent]── 工厂群 ──[]").left().padTop(6f).row();
         table.add("[lightgray]成员: []" + group.members.size).left().row();
-
-        Label comp = new Label("[lightgray]组成: []" + group.getCompositionString());
-        comp.setWrap(true);
-        table.add(comp).left().width(220f).row();
     }
 }
