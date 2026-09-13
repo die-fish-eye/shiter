@@ -16,9 +16,18 @@ public class GroupManager {
         return buildingToGroup.get(building);
     }
 
-    /** 白名单：只有被替换成 GroupCrafterBuild 的方块才算工厂 */
     public static boolean isFactory(Building b) {
         return b instanceof GroupCrafterBuild;
+    }
+
+    /** 关键：让建筑的 items/liquids 直接指向群的共享对象 */
+    private static void applyShared(Building b, FactoryGroup group) {
+        if (b.items != group.sharedItems) {
+            b.items = group.sharedItems;
+        }
+        if (b.block.hasLiquids && b.liquids != group.sharedLiquids) {
+            b.liquids = group.sharedLiquids;
+        }
     }
 
     public static boolean cleanup() {
@@ -64,6 +73,7 @@ public class GroupManager {
     public static boolean hasForeignNeighbor(Building b) {
         if (!isFactory(b)) return false;
         FactoryGroup myGroup = buildingToGroup.get(b);
+        if (myGroup == null) return true;
         int size = b.block.size;
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
@@ -78,9 +88,7 @@ public class GroupManager {
                     if (t.build == b) continue;
                     if (!isFactory(t.build)) continue;
                     FactoryGroup otherGroup = buildingToGroup.get(t.build);
-                    if (myGroup == null || otherGroup == null || otherGroup != myGroup) {
-                        return true;
-                    }
+                    if (otherGroup != myGroup) return true;
                 }
             }
         }
@@ -123,6 +131,7 @@ public class GroupManager {
         for (Building b : visited) {
             targetGroup.add(b);
             buildingToGroup.put(b, targetGroup);
+            applyShared(b, targetGroup);
         }
     }
 
@@ -162,6 +171,7 @@ public class GroupManager {
             Building current = queue.removeFirst();
             newGroup.add(current);
             buildingToGroup.put(current, newGroup);
+            applyShared(current, newGroup);
 
             int size = current.block.size;
             for (int dx = 0; dx < size; dx++) {
