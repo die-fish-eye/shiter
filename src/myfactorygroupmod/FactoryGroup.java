@@ -11,7 +11,6 @@ import mindustry.type.Item;
 import mindustry.type.ItemStack;
 import mindustry.type.Liquid;
 import mindustry.world.Block;
-import mindustry.world.blocks.production.GenericCrafter;
 import mindustry.world.modules.ItemModule;
 import mindustry.world.modules.LiquidModule;
 
@@ -50,39 +49,50 @@ public class FactoryGroup {
         return cachedComposition;
     }
 
+    /** 群内所有工厂产物的并集 */
     public Set<Item> getSharedOutputs() {
-    if (cachedOutputsMemberCount != members.size) {
-        Set<Item> outs = new HashSet<>();
+        if (cachedOutputsMemberCount != members.size) {
+            Set<Item> outs = new HashSet<>();
+            for (Building b : members) {
+                if (b.block instanceof mindustry.world.blocks.production.GenericCrafter gc) {
+                    if (gc.outputItem != null) outs.add(gc.outputItem.item);
+                    if (gc.outputItems != null) {
+                        for (ItemStack s : gc.outputItems) outs.add(s.item);
+                    }
+                }
+                if (b.block instanceof mindustry.world.blocks.production.Separator sep) {
+                    if (sep.results != null) {
+                        for (ItemStack s : sep.results) outs.add(s.item);
+                    }
+                }
+            }
+            cachedOutputs = outs;
+            cachedOutputsMemberCount = members.size;
+        }
+
+        // 钻头的 dominantItem 是动态的，每次重新收集
+        Set<Item> combined = null;
         for (Building b : members) {
-            if (b.block instanceof mindustry.world.blocks.production.GenericCrafter gc) {
-                if (gc.outputItem != null) outs.add(gc.outputItem.item);
-                if (gc.outputItems != null) {
-                    for (ItemStack s : gc.outputItems) outs.add(s.item);
-                }
-            }
-            if (b.block instanceof mindustry.world.blocks.production.Separator sep) {
-                if (sep.results != null) {
-                    for (ItemStack s : sep.results) outs.add(s.item);
-                }
+            if (b instanceof mindustry.world.blocks.production.Drill.DrillBuild db
+                    && db.dominantItem != null) {
+                if (combined == null) combined = new HashSet<>(cachedOutputs);
+                combined.add(db.dominantItem);
             }
         }
-        cachedOutputs = outs;
-        cachedOutputsMemberCount = members.size;
+        return combined != null ? combined : cachedOutputs;
     }
 
-    // 钻头的 dominantItem 是动态的，每次重新收集
-    Set<Item> drills = new HashSet<>();
-    for (Building b : members) {
-        if (b instanceof mindustry.world.blocks.production.Drill.DrillBuild db
-                && db.dominantItem != null) {
-            drills.add(db.dominantItem);
+    public void absorbItems(FactoryGroup other) {
+        for (Item item : Vars.content.items()) {
+            int amount = other.sharedItems.get(item);
+            if (amount > 0) sharedItems.add(item, amount);
         }
     }
 
-    if (drills.isEmpty()) return cachedOutputs;
-    if (cachedOutputs.containsAll(drills)) return cachedOutputs;
-
-    Set<Item> combined = new HashSet<>(cachedOutputs);
-    combined.addAll(drills);
-    return combined;
+    public void absorbLiquids(FactoryGroup other) {
+        for (Liquid liquid : Vars.content.liquids()) {
+            float amount = other.sharedLiquids.get(liquid);
+            if (amount > 0) sharedLiquids.add(liquid, amount);
+        }
+    }
 }
