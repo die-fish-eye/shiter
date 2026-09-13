@@ -2,10 +2,8 @@ package myfactorygroupmod;
 
 import arc.scene.ui.Label;
 import arc.scene.ui.layout.Table;
-import mindustry.Vars;
 import mindustry.gen.Building;
 import mindustry.type.Item;
-import mindustry.type.ItemStack;
 import mindustry.type.Liquid;
 import mindustry.world.blocks.production.GenericCrafter;
 
@@ -17,20 +15,21 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
     @Override
     public void updateTile() {
-        // 先替换 items / liquids，再走原版逻辑，避免 super 里的 dump 读到本地物品
+        // ★ 每帧强制 items/liquids 指向共享池
+        //   原版 create() 会重置 items 为新的本地模块，导致 dump 时"加共享池、减本地"
         FactoryGroup g = GroupManager.getGroup(this);
         if (g != null) {
-            if (items != g.sharedItems) items = g.sharedItems;
-            if (block.hasLiquids && liquids != g.sharedLiquids) liquids = g.sharedLiquids;
+            items = g.sharedItems;
+            if (block.hasLiquids) liquids = g.sharedLiquids;
         }
         super.updateTile();
     }
 
     @Override
     public boolean acceptItem(Building source, Item item) {
-        FactoryGroup myGroup = GroupManager.getGroup(this);
-        if (myGroup != null) {
-            if (items != myGroup.sharedItems) items = myGroup.sharedItems;
+        FactoryGroup g = GroupManager.getGroup(this);
+        if (g != null) {
+            items = g.sharedItems;  // 同样强制指向
             return items.get(item) < getMaximumAccepted(item);
         }
         return super.acceptItem(source, item);
@@ -45,54 +44,13 @@ public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
 
     @Override
     public boolean acceptLiquid(Building source, Liquid liquid) {
-        FactoryGroup myGroup = GroupManager.getGroup(this);
-        if (myGroup != null) {
-            if (liquids != myGroup.sharedLiquids) liquids = myGroup.sharedLiquids;
+        FactoryGroup g = GroupManager.getGroup(this);
+        if (g != null) {
+            if (block.hasLiquids) liquids = g.sharedLiquids;
             return block.hasLiquids
-                && liquids.get(liquid) < block.liquidCapacity * myGroup.members.size;
+                && liquids.get(liquid) < block.liquidCapacity * g.members.size;
         }
         return super.acceptLiquid(source, liquid);
-    }
-
-    private boolean isOutput(Item item) {
-        if (block.outputItem != null && block.outputItem.item == item) return true;
-        if (block.outputItems != null) {
-            for (ItemStack s : block.outputItems) {
-                if (s.item == item) return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    public boolean dump() {
-        if (items.total() <= 0) return false;
-
-        FactoryGroup myGroup = GroupManager.getGroup(this);
-        boolean dumped = false;
-
-        for (int i = 0; i < Vars.content.items().size; i++) {
-            Item item = Vars.content.item(i);
-            if (items.get(item) <= 0) continue;
-            if (!isOutput(item)) continue;
-
-            for (Building b : proximity) {
-                if (b == this) continue;
-                // 目标和我们共享同一个 items 对象 → 跳过
-                if (b.items == this.items) continue;
-                // 同群 → 跳过
-                FactoryGroup otherGroup = GroupManager.getGroup(b);
-                if (myGroup != null && otherGroup == myGroup) continue;
-
-                if (b.acceptItem(this, item)) {
-                    b.handleItem(this, item);
-                    items.remove(item, 1);   // 直接移除，绝不调 offload
-                    dumped = true;
-                    break;
-                }
-            }
-        }
-        return dumped;
     }
 
     @Override
