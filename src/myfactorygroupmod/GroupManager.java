@@ -28,11 +28,15 @@ public class GroupManager {
     }
 
     /** 重建群内所有成员的电力图 */
-    private static void refreshPower(FactoryGroup group) {
-        for (Building b : group.members) {
-            if (b.power != null) b.updatePowerGraph();
+private static void refreshPower(FactoryGroup group) {
+    // 快照，避免嵌套迭代
+    Building[] snapshot = group.members.toArray(Building.class);
+    for (Building b : snapshot) {
+        if (b != null && b.power != null && b.isValid()) {
+            b.updatePowerGraph();
         }
     }
+}
 
     public static boolean cleanup() {
         boolean changed = false;
