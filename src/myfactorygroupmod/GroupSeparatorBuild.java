@@ -5,12 +5,12 @@ import arc.struct.Seq;
 import mindustry.gen.Building;
 import mindustry.type.Item;
 import mindustry.type.Liquid;
-import mindustry.world.blocks.production.GenericCrafter;
+import mindustry.world.blocks.production.Separator;
 
-public class GroupCrafterBuild extends GenericCrafter.GenericCrafterBuild {
+public class GroupSeparatorBuild extends Separator.SeparatorBuild {
 
-    public GroupCrafterBuild(GenericCrafter crafter) {
-        crafter.super();
+    public GroupSeparatorBuild(Separator separator) {
+        separator.super();
     }
 
     @Override

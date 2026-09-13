@@ -17,8 +17,8 @@ public class GroupManager {
     }
 
     public static boolean isFactory(Building b) {
-        return b instanceof GroupCrafterBuild;
-    }
+    return b instanceof GroupCrafterBuild || b instanceof GroupSeparatorBuild;
+}
 
     private static void applyShared(Building b, FactoryGroup group) {
         if (b.items != group.sharedItems) b.items = group.sharedItems;

@@ -50,23 +50,27 @@ public class FactoryGroup {
         return cachedComposition;
     }
 
-    /** 群内所有工厂产物的并集 */
     public Set<Item> getSharedOutputs() {
-        if (cachedOutputsMemberCount != members.size) {
-            Set<Item> outs = new HashSet<>();
-            for (Building b : members) {
-                if (b.block instanceof GenericCrafter gc) {
-                    if (gc.outputItem != null) outs.add(gc.outputItem.item);
-                    if (gc.outputItems != null) {
-                        for (ItemStack s : gc.outputItems) outs.add(s.item);
-                    }
+    if (cachedOutputsMemberCount != members.size) {
+        Set<Item> outs = new HashSet<>();
+        for (Building b : members) {
+            if (b.block instanceof mindustry.world.blocks.production.GenericCrafter gc) {
+                if (gc.outputItem != null) outs.add(gc.outputItem.item);
+                if (gc.outputItems != null) {
+                    for (ItemStack s : gc.outputItems) outs.add(s.item);
                 }
             }
-            cachedOutputs = outs;
-            cachedOutputsMemberCount = members.size;
+            if (b.block instanceof mindustry.world.blocks.production.Separator sep) {
+                if (sep.results != null) {
+                    for (ItemStack s : sep.results) outs.add(s.item);
+                }
+            }
         }
-        return cachedOutputs;
+        cachedOutputs = outs;
+        cachedOutputsMemberCount = members.size;
     }
+    return cachedOutputs;
+}
 
     public void absorbItems(FactoryGroup other) {
         for (Item item : Vars.content.items()) {
