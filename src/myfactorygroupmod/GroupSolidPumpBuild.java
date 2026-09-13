@@ -23,7 +23,8 @@ public class GroupSolidPumpBuild extends SolidPump.SolidPumpBuild {
     public boolean shouldConsume(){
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null || g.members.size <= 0) return super.shouldConsume();
-        return liquids.get(result) < block.liquidCapacity * g.members.size - 0.01f && enabled;
+        if (liquidDrop == null) return false;
+        return liquids.get(liquidDrop) < block.liquidCapacity * g.members.size - 0.01f && enabled;
     }
 
     @Override

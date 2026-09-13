@@ -23,7 +23,8 @@ public class GroupFrackerBuild extends Fracker.FrackerBuild {
     public boolean shouldConsume(){
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null || g.members.size <= 0) return super.shouldConsume();
-        return liquids.get(result) < block.liquidCapacity * g.members.size - 0.01f && enabled;
+        if (liquidDrop == null) return false;
+        return liquids.get(liquidDrop) < block.liquidCapacity * g.members.size - 0.01f && enabled;
     }
 
     @Override
