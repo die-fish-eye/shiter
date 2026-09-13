@@ -24,7 +24,11 @@ public class GroupManager {
         || b instanceof GroupHeaterGeneratorBuild
         || b instanceof GroupImpactReactorBuild
         || b instanceof GroupVariableReactorBuild
-        || b instanceof GroupNuclearReactorBuild;
+        || b instanceof GroupNuclearReactorBuild
+        || b instanceof GroupPumpBuild
+        || b instanceof GroupSolidPumpBuild
+        || b instanceof GroupFrackerBuild
+        || b instanceof GroupAttributeCrafterBuild;
 }
 
     private static void applyShared(Building b, FactoryGroup group) {
