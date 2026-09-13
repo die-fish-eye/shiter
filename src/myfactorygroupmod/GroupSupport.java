@@ -54,36 +54,61 @@ public final class GroupSupport {
     }
 
     public static boolean dumpShared(Building self, Item item) {
-        if (!self.block.hasItems || self.items == null || self.items.total() == 0
-                || self.proximity.size == 0) return false;
-        if (item != null && !self.items.has(item)) return false;
+    if (!self.block.hasItems || self.items == null || self.items.total() == 0
+            || self.proximity.size == 0) return false;
+    if (item != null && !self.items.has(item)) return false;
 
-        FactoryGroup myG = GroupManager.getGroup(self);
-        int dump = self.cdump;
+    FactoryGroup myG = GroupManager.getGroup(self);
+    // 只允许 dump 群共享产物
+    java.util.Set<Item> allowed = myG != null ? myG.getSharedOutputs() : null;
 
-        var allItems = mindustry.Vars.content.items();
-        int itemSize = allItems.size;
-        Object[] itemArray = allItems.items;
+    int dump = self.cdump;
+    var allItems = mindustry.Vars.content.items();
+    int itemSize = allItems.size;
 
-        if (item == null) {
-            for (int i = 0; i < self.proximity.size; i++) {
-                Building other = self.proximity.get((i + dump) % self.proximity.size);
-                FactoryGroup otherG = GroupManager.getGroup(other);
-                if (myG != null && otherG == myG) {
+    if (item == null) {
+        for (int i = 0; i < self.proximity.size; i++) {
+            Building other = self.proximity.get((i + dump) % self.proximity.size);
+            FactoryGroup otherG = GroupManager.getGroup(other);
+            if (myG != null && otherG == myG) {
+                self.incrementDump(self.proximity.size);
+                continue;
+            }
+
+            for (int ii = 0; ii < itemSize; ii++) {
+                if (!self.items.has(ii)) continue;
+                Item it = allItems.get(ii);
+                if (allowed != null && !allowed.contains(it)) continue;
+                if (other.acceptItem(self, it) && self.canDump(other, it)) {
+                    other.handleItem(self, it);
+                    self.items.remove(it, 1);
                     self.incrementDump(self.proximity.size);
-                    continue;
+                    return true;
                 }
+            }
+            self.incrementDump(self.proximity.size);
+        }
+    } else {
+        if (allowed != null && !allowed.contains(item)) return false;
+        for (int i = 0; i < self.proximity.size; i++) {
+            Building other = self.proximity.get((i + dump) % self.proximity.size);
+            FactoryGroup otherG = GroupManager.getGroup(other);
+            if (myG != null && otherG == myG) {
+                self.incrementDump(self.proximity.size);
+                continue;
+            }
 
-                for (int ii = 0; ii < itemSize; ii++) {
-                    if (!self.items.has(ii)) continue;
-                    Item it = (Item) itemArray[ii];
-                    if (other.acceptItem(self, it) && self.canDump(other, it)) {
-                        other.handleItem(self, it);
-                        self.items.remove(it, 1);
-                        self.incrementDump(self.proximity.size);
-                        return true;
-                    }
-                }
+            if (other.acceptItem(self, item) && self.canDump(other, item)) {
+                other.handleItem(self, item);
+                self.items.remove(item, 1);
+                self.incrementDump(self.proximity.size);
+                return true;
+            }
+            self.incrementDump(self.proximity.size);
+        }
+    }
+    return false;
+}
                 self.incrementDump(self.proximity.size);
             }
         } else {
