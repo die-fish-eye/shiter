@@ -1,5 +1,6 @@
 package myfactorygroupmod;
 
+import arc.math.Mathf;
 import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import mindustry.gen.Building;
@@ -14,9 +15,55 @@ public class GroupDrillBuild extends Drill.DrillBuild {
     }
 
     @Override
-    public void updateTile() {
+    public void updateTile(){
         GroupSupport.redirectModules(this);
-        super.updateTile();
+
+        Drill drill = (Drill) block;
+        FactoryGroup g = GroupManager.getGroup(this);
+        int cap = (g != null && g.members.size > 0)
+            ? block.itemCapacity * g.members.size
+            : block.itemCapacity;
+
+        if (dominantItem == null) {
+            GroupSupport.extraDump(this);
+            return;
+        }
+
+        timeDrilled += warmup * delta();
+        float delay = drill.getDrillTime(dominantItem);
+
+        // 关键：只检查自己的产物，不检查整个共享池的总物品数
+        if (items.get(dominantItem) < cap && dominantItems > 0 && efficiency > 0) {
+            float speed = Mathf.lerp(1f, drill.liquidBoostIntensity, optionalEfficiency) * efficiency;
+            lastDrillSpeed = (speed * dominantItems * warmup) / delay;
+            warmup = Mathf.approachDelta(warmup, speed, drill.warmupSpeed);
+            progress += delta() * dominantItems * speed * warmup;
+
+            if (Mathf.chanceDelta(drill.updateEffectChance * warmup)) {
+                drill.updateEffect.at(x + Mathf.range(block.size * 2f), y + Mathf.range(block.size * 2f));
+            }
+        } else {
+            lastDrillSpeed = 0f;
+            warmup = Mathf.approachDelta(warmup, 0f, drill.warmupSpeed);
+            GroupSupport.extraDump(this);
+            return;
+        }
+
+        if (dominantItems > 0 && progress >= delay && items.get(dominantItem) < cap) {
+            int amount = (int) (progress / delay);
+            for (int i = 0; i < amount; i++) {
+                offload(dominantItem);
+            }
+            progress %= delay;
+
+            if (wasVisible && Mathf.chanceDelta(drill.drillEffectChance * warmup)) {
+                drill.drillEffect.at(
+                    x + Mathf.range(drill.drillEffectRnd),
+                    y + Mathf.range(drill.drillEffectRnd),
+                    dominantItem.color);
+            }
+        }
+
         GroupSupport.extraDump(this);
     }
 
@@ -24,8 +71,6 @@ public class GroupDrillBuild extends Drill.DrillBuild {
     public boolean shouldConsume(){
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null || g.members.size <= 0) return super.shouldConsume();
-
-        // 只关心自己挖到的那种矿是否堆满
         if (dominantItem == null) return false;
         int cap = block.itemCapacity * g.members.size;
         return items.get(dominantItem) < cap && enabled;

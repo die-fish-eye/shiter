@@ -17,19 +17,19 @@ public class GroupManager {
     }
 
     public static boolean isFactory(Building b) {
-    return b instanceof GroupCrafterBuild
-        || b instanceof GroupSeparatorBuild
-        || b instanceof GroupDrillBuild
-        || b instanceof GroupConsumeGeneratorBuild
-        || b instanceof GroupHeaterGeneratorBuild
-        || b instanceof GroupImpactReactorBuild
-        || b instanceof GroupVariableReactorBuild
-        || b instanceof GroupNuclearReactorBuild
-        || b instanceof GroupPumpBuild
-        || b instanceof GroupSolidPumpBuild
-        || b instanceof GroupFrackerBuild
-        || b instanceof GroupAttributeCrafterBuild;
-}
+        return b instanceof GroupCrafterBuild
+            || b instanceof GroupSeparatorBuild
+            || b instanceof GroupDrillBuild
+            || b instanceof GroupConsumeGeneratorBuild
+            || b instanceof GroupHeaterGeneratorBuild
+            || b instanceof GroupImpactReactorBuild
+            || b instanceof GroupVariableReactorBuild
+            || b instanceof GroupNuclearReactorBuild
+            || b instanceof GroupPumpBuild
+            || b instanceof GroupSolidPumpBuild
+            || b instanceof GroupFrackerBuild
+            || b instanceof GroupAttributeCrafterBuild;
+    }
 
     private static void applyShared(Building b, FactoryGroup group) {
         if (b.items != group.sharedItems) b.items = group.sharedItems;
@@ -38,16 +38,14 @@ public class GroupManager {
         }
     }
 
-    /** 重建群内所有成员的电力图 */
     private static void refreshPower(FactoryGroup group) {
-    // 快照，避免嵌套迭代
-    arc.struct.Seq<Building> snapshot = group.members.toSeq();
-    for (Building b : snapshot) {
-        if (b != null && b.power != null && b.isValid()) {
-            b.updatePowerGraph();
+        arc.struct.Seq<Building> snapshot = group.members.toSeq();
+        for (Building b : snapshot) {
+            if (b != null && b.power != null && b.isValid()) {
+                b.updatePowerGraph();
+            }
         }
     }
-}
 
     public static boolean cleanup() {
         boolean changed = false;
@@ -67,12 +65,14 @@ public class GroupManager {
         return b.tile.build == b;
     }
 
+    /** 计算建筑占据的所有格子并向外扩展一格，返回相邻工厂 */
     private static void enqueueNeighbors(Building b, Queue<Building> queue, ObjectSet<Building> visited) {
         int size = b.block.size;
+        int soff = b.block.sizeOffset;
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
-                int tx = b.tile.x + dx;
-                int ty = b.tile.y + dy;
+                int tx = b.tile.x + soff + dx;
+                int ty = b.tile.y + soff + dy;
                 for (int[] d : DIRS) {
                     int nx = tx + d[0];
                     int ny = ty + d[1];
@@ -94,10 +94,11 @@ public class GroupManager {
         FactoryGroup myGroup = buildingToGroup.get(b);
         if (myGroup == null) return true;
         int size = b.block.size;
+        int soff = b.block.sizeOffset;
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
-                int tx = b.tile.x + dx;
-                int ty = b.tile.y + dy;
+                int tx = b.tile.x + soff + dx;
+                int ty = b.tile.y + soff + dy;
                 for (int[] d : DIRS) {
                     int nx = tx + d[0];
                     int ny = ty + d[1];
@@ -153,7 +154,6 @@ public class GroupManager {
             applyShared(b, targetGroup);
         }
 
-        // 群结构变化，刷新电力
         refreshPower(targetGroup);
     }
 
@@ -181,7 +181,6 @@ public class GroupManager {
             newGroups.add(bfsAssign(b, allMembers));
         }
 
-        // 所有新分裂的群，刷新电力
         for (FactoryGroup g : newGroups) {
             refreshPower(g);
         }
@@ -202,10 +201,11 @@ public class GroupManager {
             applyShared(current, newGroup);
 
             int size = current.block.size;
+            int soff = current.block.sizeOffset;
             for (int dx = 0; dx < size; dx++) {
                 for (int dy = 0; dy < size; dy++) {
-                    int tx = current.tile.x + dx;
-                    int ty = current.tile.y + dy;
+                    int tx = current.tile.x + soff + dx;
+                    int ty = current.tile.y + soff + dy;
                     for (int[] d : DIRS) {
                         int nx = tx + d[0];
                         int ny = ty + d[1];
