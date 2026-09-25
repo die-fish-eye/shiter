@@ -1,5 +1,5 @@
 name: "factory-group-mod"
-displayName: "工厂群模组"
+displayName: "群模组"
 author: "diefisheye"
 description: "让相邻工厂共享物品库存"
 version: "1.0"

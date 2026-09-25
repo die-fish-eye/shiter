@@ -31,10 +31,34 @@ public final class GroupSupport {
         }
     }
 
+    /** 判断物品是否是群内任何工厂的原料 */
+    private static boolean isGroupItemInput(FactoryGroup g, Item item) {
+        for (Building b : g.members) {
+            if (b.block.consumesItem(item)) return true;
+        }
+        return false;
+    }
+
+    /** 判断液体是否是群内任何工厂的原料 */
+    private static boolean isGroupLiquidInput(FactoryGroup g, Liquid liquid) {
+        for (Building b : g.members) {
+            if (b.block.consumesLiquid(liquid)) return true;
+        }
+        return false;
+    }
+
     public static boolean acceptItem(Building self, Building source, Item item) {
         FactoryGroup g = GroupManager.getGroup(self);
         if (g == null) return false;
         self.items = g.sharedItems;
+
+        // 同群来源：直接放行
+        FactoryGroup srcGroup = source == null ? null : GroupManager.getGroup(source);
+        if (srcGroup != g) {
+            // 群外来源（传送带等）：只接受群内工厂的原料
+            if (!isGroupItemInput(g, item)) return false;
+        }
+
         return self.items.get(item) < getMaxAccepted(self, item);
     }
 
@@ -48,6 +72,12 @@ public final class GroupSupport {
         FactoryGroup g = GroupManager.getGroup(self);
         if (g == null) return false;
         if (self.block.hasLiquids) self.liquids = g.sharedLiquids;
+
+        FactoryGroup srcGroup = source == null ? null : GroupManager.getGroup(source);
+        if (srcGroup != g) {
+            if (!isGroupLiquidInput(g, liquid)) return false;
+        }
+
         return self.block.hasLiquids
             && self.liquids.get(liquid) < self.block.liquidCapacity * g.members.size;
     }
