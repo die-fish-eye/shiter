@@ -1,5 +1,6 @@
 package myfactorygroupmod;
 
+import arc.scene.ui.layout.Table;
 import arc.struct.Seq;
 import mindustry.gen.Building;
 import mindustry.gen.Call;
@@ -11,7 +12,7 @@ public class GroupWallBuild extends Wall.WallBuild {
         wall.super();
     }
 
-    /** hook into vanilla damage pipeline: return value is subtracted from this wall's health */
+    /** 拦截伤害：所有伤害都从群共享血池扣除，自己返回 0 让原版不再扣血 */
     @Override
     public float handleDamage(float amount) {
         FactoryGroup g = GroupManager.getWallGroup(this);
@@ -25,15 +26,15 @@ public class GroupWallBuild extends Wall.WallBuild {
         float newFrac = Math.max(0f, oldFrac - amount / totalMax);
         g.wallHealthFraction = newFrac;
 
-        // sync other members
+        // 同步其他成员血量
         for (Building b : g.members) {
             if (b != this) b.health = b.maxHealth * newFrac;
         }
 
-        // sync self, then return 0 so vanilla doesn't subtract again
+        // 同步自己，返回 0 表示原版不再额外扣血
         health = maxHealth * newFrac;
 
-        // group wiped: bring down every wall at once
+        // 群血量归零：所有墙一起倒
         if (newFrac <= 0f) {
             Seq<Building> snapshot = g.members.toSeq();
             for (Building b : snapshot) {
@@ -45,5 +46,11 @@ public class GroupWallBuild extends Wall.WallBuild {
         }
 
         return 0f;
+    }
+
+    @Override
+    public void display(Table table) {
+        super.display(table);
+        GroupSupport.displayGroup(this, table);
     }
 }

@@ -1,5 +1,6 @@
 package myfactorygroupmod;
 
+import arc.math.Mathf;
 import arc.struct.ObjectMap;
 import arc.struct.ObjectSet;
 import arc.struct.Queue;
@@ -65,8 +66,9 @@ public class GroupManager {
         buildingToGroup.remove(b);
     }
 
+    /** 墙只共享血量，不共享物品/液体 */
     private static void applyShared(Building b, FactoryGroup group) {
-        if (isWall(b)) return; // walls share hp, not items/liquids
+        if (isWall(b)) return;
         if (b.items != group.sharedItems) b.items = group.sharedItems;
         if (b.block.hasLiquids && b.liquids != group.sharedLiquids) {
             b.liquids = group.sharedLiquids;
@@ -109,7 +111,7 @@ public class GroupManager {
         return b.tile.build == b;
     }
 
-    /** same-kind check for group expansion */
+    /** 同类才进同一个群：墙/炮塔/工厂互相隔离 */
     private static boolean sameKind(Building a, Building b) {
         if (isWall(a)) return isWall(b);
         if (isTurret(a)) return isTurret(b);
@@ -205,16 +207,16 @@ public class GroupManager {
             applyShared(b, targetGroup);
         }
 
-        // wall group: sync new member's hp with the existing fraction
+        // 墙群：把当前所有成员的现有血量相加，重算比例，然后统一同步
         if (isWall(building)) {
             float totalMax = 0f;
-            for (Building b : targetGroup.members) totalMax += b.maxHealth;
-            float totalHp = targetGroup.wallHealthFraction * totalMax;
-            // new wall joins at full hp
-            totalHp += building.maxHealth;
-            totalMax += building.maxHealth;
+            float totalHp = 0f;
+            for (Building b : targetGroup.members) {
+                totalMax += b.maxHealth;
+                totalHp += b.health;
+            }
             if (totalMax > 0f) {
-                targetGroup.wallHealthFraction = Math.min(1f, totalHp / totalMax);
+                targetGroup.wallHealthFraction = Mathf.clamp(totalHp / totalMax, 0f, 1f);
             }
             for (Building b : targetGroup.members) {
                 b.health = b.maxHealth * targetGroup.wallHealthFraction;
@@ -292,7 +294,7 @@ public class GroupManager {
             }
         }
 
-        // re-sync wall hp to the (possibly new) fraction
+        // 墙群拆分后，按继承的比例同步血量
         if (isWall(start)) {
             for (Building b : newGroup.members) {
                 b.health = b.maxHealth * newGroup.wallHealthFraction;

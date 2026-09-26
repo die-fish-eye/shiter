@@ -15,7 +15,7 @@ public class MyFactoryGroupMod extends Mod {
 
     @Override
     public void loadContent() {
-        Log.info("[fgm] loadContent done (no custom blocks)");
+        Log.info("[fgm] loadContent 完成（不新增方块）");
     }
 
     @Override
@@ -48,17 +48,13 @@ public class MyFactoryGroupMod extends Mod {
         int patched = 0;
         for (Block b : Vars.content.blocks()) {
 
-            // === Wall: dual-condition match, with diagnostics ===
+            // === 墙：双重判断，避免依赖具体类名 ===
             if (b instanceof mindustry.world.blocks.defense.Wall wall) {
                 try {
                     Building test = b.buildType.get();
                     Class<?> cls = test.getClass();
                     Class<?> enclosing = cls.getEnclosingClass();
                     String clsName = cls.getName();
-                    String encName = enclosing == null ? "null" : enclosing.getName();
-
-                    Log.info("[fgm] Wall candidate: @ cls=@ enc=@",
-                        b.name, clsName, encName);
 
                     boolean isPlainWall =
                         clsName.equals("mindustry.world.blocks.defense.Wall$WallBuild")
@@ -67,7 +63,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (isPlainWall) {
                         b.buildType = () -> new GroupWallBuild(wall);
                         patched++;
-                        Log.info("[fgm] replaced Wall: @", b.name);
+                        Log.info("[fgm] 已替换 墙: @", b.name);
                     }
                 } catch (Throwable t) {
                     Log.warn("[fgm] @: @", b.name, t.getMessage());
@@ -75,7 +71,7 @@ public class MyFactoryGroupMod extends Mod {
                 continue;
             }
 
-            // === ItemTurret ===
+            // === 物品炮塔 ===
             if (b instanceof mindustry.world.blocks.defense.turrets.ItemTurret it) {
                 try {
                     Building test = b.buildType.get();
@@ -85,20 +81,20 @@ public class MyFactoryGroupMod extends Mod {
                         it.selectionRows = 5;
                         it.selectionColumns = 4;
                         patched++;
-                        Log.info("[fgm] replaced ItemTurret: @", b.name);
+                        Log.info("[fgm] 已替换 炮塔: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
             }
 
-            // === factory subclasses ===
+            // === 工厂子类（具体 → 一般）===
             if (b instanceof mindustry.world.blocks.production.Fracker fr) {
                 try {
                     Building test = b.buildType.get();
                     if (test.getClass().getName().endsWith("$FrackerBuild")) {
                         b.buildType = () -> new GroupFrackerBuild(fr);
                         patched++;
-                        Log.info("[fgm] replaced Fracker: @", b.name);
+                        Log.info("[fgm] 已替换 油提取机: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -110,7 +106,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$SolidPumpBuild")) {
                         b.buildType = () -> new GroupSolidPumpBuild(sp);
                         patched++;
-                        Log.info("[fgm] replaced SolidPump: @", b.name);
+                        Log.info("[fgm] 已替换 固体泵: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -122,7 +118,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$PumpBuild")) {
                         b.buildType = () -> new GroupPumpBuild(p);
                         patched++;
-                        Log.info("[fgm] replaced Pump: @", b.name);
+                        Log.info("[fgm] 已替换 泵: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -135,7 +131,7 @@ public class MyFactoryGroupMod extends Mod {
                             "mindustry.world.blocks.production.Separator$SeparatorBuild")) {
                         b.buildType = () -> new GroupSeparatorBuild(sep);
                         patched++;
-                        Log.info("[fgm] replaced Separator: @", b.name);
+                        Log.info("[fgm] 已替换 分离机: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -147,7 +143,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$DrillBuild")) {
                         b.buildType = () -> new GroupDrillBuild(drill);
                         patched++;
-                        Log.info("[fgm] replaced Drill: @", b.name);
+                        Log.info("[fgm] 已替换 钻头: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -159,7 +155,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$NuclearReactorBuild")) {
                         b.buildType = () -> new GroupNuclearReactorBuild(nr);
                         patched++;
-                        Log.info("[fgm] replaced NuclearReactor: @", b.name);
+                        Log.info("[fgm] 已替换 钍反应堆: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -171,7 +167,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$VariableReactorBuild")) {
                         b.buildType = () -> new GroupVariableReactorBuild(vr);
                         patched++;
-                        Log.info("[fgm] replaced VariableReactor: @", b.name);
+                        Log.info("[fgm] 已替换 变量反应堆: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -183,7 +179,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$ImpactReactorBuild")) {
                         b.buildType = () -> new GroupImpactReactorBuild(ir);
                         patched++;
-                        Log.info("[fgm] replaced ImpactReactor: @", b.name);
+                        Log.info("[fgm] 已替换 冲击反应堆: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -195,7 +191,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$HeaterGeneratorBuild")) {
                         b.buildType = () -> new GroupHeaterGeneratorBuild(hg);
                         patched++;
-                        Log.info("[fgm] replaced HeaterGenerator: @", b.name);
+                        Log.info("[fgm] 已替换 供热发电机: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -207,7 +203,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$ConsumeGeneratorBuild")) {
                         b.buildType = () -> new GroupConsumeGeneratorBuild(gen);
                         patched++;
-                        Log.info("[fgm] replaced ConsumeGenerator: @", b.name);
+                        Log.info("[fgm] 已替换 发电机: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -219,7 +215,7 @@ public class MyFactoryGroupMod extends Mod {
                     if (test.getClass().getName().endsWith("$AttributeCrafterBuild")) {
                         b.buildType = () -> new GroupAttributeCrafterBuild(ac);
                         patched++;
-                        Log.info("[fgm] replaced AttributeCrafter: @", b.name);
+                        Log.info("[fgm] 已替换 属性工厂: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
                 continue;
@@ -232,11 +228,11 @@ public class MyFactoryGroupMod extends Mod {
                             "mindustry.world.blocks.production.GenericCrafter$GenericCrafterBuild")) {
                         b.buildType = () -> new GroupCrafterBuild(gc);
                         patched++;
-                        Log.info("[fgm] replaced GenericCrafter: @", b.name);
+                        Log.info("[fgm] 已替换 通用工厂: @", b.name);
                     }
                 } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
             }
         }
-        Log.info("[fgm] replaced @ blocks total", patched);
+        Log.info("[fgm] 共替换 @ 个方块", patched);
     }
 }
