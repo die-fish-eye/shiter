@@ -1,8 +1,10 @@
 package myfactorygroupmod;
 
 import arc.scene.ui.layout.Table;
-import arc.struct.ObjectMap;
 import arc.struct.Seq;
+import arc.util.Log;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Building;
 import mindustry.type.Item;
@@ -12,23 +14,43 @@ import mindustry.world.blocks.defense.turrets.Turret;
 
 public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
+    // === 反射缓存：原版 ItemEntry 的构造器和 item 字段 ===
+    private static Constructor<?> itemEntryCtor;
+    private static Field itemEntryItemField;
+
+    static {
+        try {
+            Class<?> cls = Class.forName(
+                "mindustry.world.blocks.defense.turrets.ItemTurret$ItemEntry");
+            itemEntryCtor = cls.getDeclaredConstructor(ItemTurret.class, Item.class, int.class);
+            itemEntryCtor.setAccessible(true);
+            itemEntryItemField = cls.getField("item");
+        } catch (Throwable t) {
+            Log.warn("[fgm] 无法反射 ItemEntry: @", t.getMessage());
+        }
+    }
+
     public GroupItemTurretBuild(ItemTurret turret) {
         turret.super();
     }
 
-    /** 自定义 AmmoEntry，替代原版 package-private 的 ItemTurret.ItemEntry */
-    public static class GroupAmmoEntry extends Turret.AmmoEntry {
-        public Item item;
-        public final ObjectMap<Item, BulletType> ammoTypes;
-
-        public GroupAmmoEntry(Item item, ObjectMap<Item, BulletType> ammoTypes) {
-            this.item = item;
-            this.ammoTypes = ammoTypes;
+    /** 通过反射创建原版 ItemEntry */
+    private Turret.AmmoEntry makeEntry(Item item, int amount) {
+        if (itemEntryCtor == null) return null;
+        try {
+            return (Turret.AmmoEntry) itemEntryCtor.newInstance((ItemTurret) block, item, amount);
+        } catch (Throwable t) {
+            return null;
         }
+    }
 
-        @Override
-        public BulletType type() {
-            return ammoTypes.get(item);
+    /** 读取 entry 的 item 字段 */
+    private Item getEntryItem(Turret.AmmoEntry entry) {
+        if (entry == null || itemEntryItemField == null) return null;
+        try {
+            return (Item) itemEntryItemField.get(entry);
+        } catch (Throwable t) {
+            return null;
         }
     }
 
@@ -38,27 +60,20 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         super.updateTile();
     }
 
-    /** 从 ammo 队列中读取当前"选中"的弹药类型 */
-    private Item currentAmmoItem() {
-        if (ammo.size == 0) return null;
-        Turret.AmmoEntry entry = ammo.peek();
-        if (entry instanceof GroupAmmoEntry g) return g.item;
-        if (entry instanceof ItemTurret.ItemEntry ie) return ie.item;
-        return null;
-    }
-
-    // ===== 弹药共享 =====
+    // ===== 物品接收 =====
 
     @Override
     public boolean acceptItem(Building source, Item item) {
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null) return super.acceptItem(source, item);
-
-        // 只接受有效弹药类型
         if (((ItemTurret) block).ammoTypes.get(item) == null) return false;
-
         items = g.sharedItems;
-        return true;
+        return items.get(item) < getMaximumAccepted(item);
+    }
+
+    @Override
+    public int getMaximumAccepted(Item item) {
+        return GroupSupport.getMaxAccepted(this, item);
     }
 
     @Override
@@ -74,32 +89,41 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
         items = g.sharedItems;
         items.add(item, 1);
-        totalAmmo += type.ammoMultiplier;
 
-        // 更新 ammo 队列：把该物品移到队尾（作为当前"选中"类型）
+        // 更新或添加 ammo 队列条目（用原版 ItemEntry）
         for (int i = 0; i < ammo.size; i++) {
             Turret.AmmoEntry entry = ammo.get(i);
-            Item entryItem = null;
-            if (entry instanceof GroupAmmoEntry ga) entryItem = ga.item;
-            else if (entry instanceof ItemTurret.ItemEntry ie) entryItem = ie.item;
-
+            Item entryItem = getEntryItem(entry);
             if (entryItem == item) {
+                entry.amount += (int) type.ammoMultiplier;
                 ammo.swap(i, ammo.size - 1);
                 return;
             }
         }
-        ammo.add(new GroupAmmoEntry(item, turret.ammoTypes));
+        Turret.AmmoEntry newEntry = makeEntry(item, (int) type.ammoMultiplier);
+        if (newEntry != null) ammo.add(newEntry);
     }
+
+    // ===== 弹药消费 =====
 
     @Override
     public boolean hasAmmo() {
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null) return super.hasAmmo();
         if (!canConsume()) return false;
-        Item cur = currentAmmoItem();
+        if (ammo.size == 0) return false;
+        if (cheating()) return true;
+
+        Turret.AmmoEntry entry = ammo.peek();
+        Item cur = getEntryItem(entry);
         if (cur == null) return false;
+
+        int use = ((ItemTurret) block).ammoPerShot;
+        if (entry.amount >= use) return true;
+
+        // 弹夹不足时看共享池
         items = g.sharedItems;
-        return items.get(cur) >= ((ItemTurret) block).ammoPerShot || cheating();
+        return items.get(cur) >= 1;
     }
 
     @Override
@@ -107,21 +131,40 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null) return super.useAmmo();
         if (cheating()) return peekAmmo();
-        Item cur = currentAmmoItem();
+        if (ammo.size == 0) return null;
+
+        Turret.AmmoEntry entry = ammo.peek();
+        Item cur = getEntryItem(entry);
         if (cur == null) return null;
-        items = g.sharedItems;
+        BulletType type = ((ItemTurret) block).ammoTypes.get(cur);
+        if (type == null) return null;
+
         int use = ((ItemTurret) block).ammoPerShot;
-        items.remove(cur, use);
+
+        // 弹夹不足，从共享池扣 1 个物品重新填满
+        if (entry.amount < use) {
+            items = g.sharedItems;
+            if (items.get(cur) < 1) return null;
+            items.remove(cur, 1);
+            entry.amount += (int) type.ammoMultiplier;
+        }
+
+        if (entry.amount < use) return null;
+
+        entry.amount -= use;
         totalAmmo = Math.max(totalAmmo - use, 0);
-        return ((ItemTurret) block).ammoTypes.get(cur);
+        return type;
     }
 
     @Override
-    public BulletType peekAmmo() {
+    public float getAmmoFraction() {
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g == null) return super.peekAmmo();
-        Item cur = currentAmmoItem();
-        return cur == null ? null : ((ItemTurret) block).ammoTypes.get(cur);
+        if (g == null) return super.getAmmoFraction();
+        if (ammo.size == 0) return 0f;
+        Item cur = getEntryItem(ammo.peek());
+        if (cur == null) return 0f;
+        items = g.sharedItems;
+        return Math.min(1f, (float) items.get(cur) / Math.max(1, maxAmmo));
     }
 
     /** 炮塔不主动 dump 弹药 */
