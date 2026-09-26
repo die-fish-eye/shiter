@@ -19,6 +19,9 @@ public class FactoryGroup {
     public final ItemModule sharedItems = new ItemModule();
     public final LiquidModule sharedLiquids = new LiquidModule();
 
+    /** shared hp fraction for wall groups (1.0 = full) */
+    public float wallHealthFraction = 1f;
+
     private String cachedComposition = "";
     private int cachedMemberCount = -1;
 
@@ -49,11 +52,6 @@ public class FactoryGroup {
         return cachedComposition;
     }
 
-    /**
-     * 群内可被 dump 的产物集合。
-     * - 工厂产物（GenericCrafter/Separator）：总是包含
-     * - 钻头产物：仅当群内没有工厂时才包含，否则留给工厂消费
-     */
     public Set<Item> getSharedOutputs() {
         if (cachedOutputsMemberCount != members.size) {
             Set<Item> outs = new HashSet<>();
@@ -74,7 +72,6 @@ public class FactoryGroup {
             cachedOutputsMemberCount = members.size;
         }
 
-        // 群内有工厂 → 钻头产物不参与 dump，留给工厂当原料
         for (Building b : members) {
             if (b instanceof GroupCrafterBuild
                     || b instanceof GroupSeparatorBuild
@@ -83,7 +80,6 @@ public class FactoryGroup {
             }
         }
 
-        // 群内没有工厂（只有钻头 + 其他非工厂）→ 钻头产物参与 dump
         Set<Item> combined = null;
         for (Building b : members) {
             if (b instanceof mindustry.world.blocks.production.Drill.DrillBuild db

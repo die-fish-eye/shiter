@@ -11,12 +11,19 @@ public class GroupManager {
 
     private static final ObjectMap<Building, FactoryGroup> buildingToGroup = new ObjectMap<>();
     private static final ObjectMap<Building, FactoryGroup> turretToGroup = new ObjectMap<>();
+    private static final ObjectMap<Building, FactoryGroup> wallToGroup = new ObjectMap<>();
     private static final int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
 
     public static FactoryGroup getGroup(Building b) {
         FactoryGroup g = buildingToGroup.get(b);
         if (g != null) return g;
-        return turretToGroup.get(b);
+        g = turretToGroup.get(b);
+        if (g != null) return g;
+        return wallToGroup.get(b);
+    }
+
+    public static FactoryGroup getWallGroup(Building b) {
+        return wallToGroup.get(b);
     }
 
     public static boolean isFactory(Building b) {
@@ -38,21 +45,28 @@ public class GroupManager {
         return b instanceof GroupItemTurretBuild;
     }
 
+    public static boolean isWall(Building b) {
+        return b instanceof GroupWallBuild;
+    }
+
     public static boolean isGroupable(Building b) {
-        return isFactory(b) || isTurret(b);
+        return isFactory(b) || isTurret(b) || isWall(b);
     }
 
     private static void setGroup(Building b, FactoryGroup g) {
-        if (isTurret(b)) turretToGroup.put(b, g);
+        if (isWall(b)) wallToGroup.put(b, g);
+        else if (isTurret(b)) turretToGroup.put(b, g);
         else buildingToGroup.put(b, g);
     }
 
     private static void removeGroup(Building b) {
+        wallToGroup.remove(b);
         turretToGroup.remove(b);
         buildingToGroup.remove(b);
     }
 
     private static void applyShared(Building b, FactoryGroup group) {
+        if (isWall(b)) return; // walls share hp, not items/liquids
         if (b.items != group.sharedItems) b.items = group.sharedItems;
         if (b.block.hasLiquids && b.liquids != group.sharedLiquids) {
             b.liquids = group.sharedLiquids;
@@ -70,18 +84,16 @@ public class GroupManager {
 
     public static boolean cleanup() {
         boolean changed = false;
+        changed |= cleanupMap(buildingToGroup);
+        changed |= cleanupMap(turretToGroup);
+        changed |= cleanupMap(wallToGroup);
+        return changed;
+    }
 
-        ObjectMap<Building, FactoryGroup> copy1 = new ObjectMap<>(buildingToGroup);
-        for (ObjectMap.Entry<Building, FactoryGroup> e : copy1) {
-            Building b = e.key;
-            if (b == null || !isAlive(b)) {
-                onBuildingRemoved(b);
-                changed = true;
-            }
-        }
-
-        ObjectMap<Building, FactoryGroup> copy2 = new ObjectMap<>(turretToGroup);
-        for (ObjectMap.Entry<Building, FactoryGroup> e : copy2) {
+    private static boolean cleanupMap(ObjectMap<Building, FactoryGroup> map) {
+        boolean changed = false;
+        ObjectMap<Building, FactoryGroup> copy = new ObjectMap<>(map);
+        for (ObjectMap.Entry<Building, FactoryGroup> e : copy) {
             Building b = e.key;
             if (b == null || !isAlive(b)) {
                 onBuildingRemoved(b);
@@ -92,14 +104,21 @@ public class GroupManager {
     }
 
     private static boolean isAlive(Building b) {
+        if (b == null) return false;
         if (b.tile == null) return false;
         return b.tile.build == b;
+    }
+
+    /** same-kind check for group expansion */
+    private static boolean sameKind(Building a, Building b) {
+        if (isWall(a)) return isWall(b);
+        if (isTurret(a)) return isTurret(b);
+        return isFactory(b);
     }
 
     private static void enqueueNeighbors(Building b, Queue<Building> queue, ObjectSet<Building> visited) {
         int size = b.block.size;
         int soff = b.block.sizeOffset;
-        boolean turret = isTurret(b);
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
                 int tx = b.tile.x + soff + dx;
@@ -111,7 +130,7 @@ public class GroupManager {
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
-                    if (turret ? !isTurret(t.build) : !isFactory(t.build)) continue;
+                    if (!sameKind(b, t.build)) continue;
                     if (visited.contains(t.build)) continue;
                     visited.add(t.build);
                     queue.addLast(t.build);
@@ -126,7 +145,6 @@ public class GroupManager {
         if (myGroup == null) return true;
         int size = b.block.size;
         int soff = b.block.sizeOffset;
-        boolean turret = isTurret(b);
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
                 int tx = b.tile.x + soff + dx;
@@ -138,7 +156,7 @@ public class GroupManager {
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
-                    if (turret ? !isTurret(t.build) : !isFactory(t.build)) continue;
+                    if (!sameKind(b, t.build)) continue;
                     FactoryGroup otherGroup = getGroup(t.build);
                     if (otherGroup != myGroup) return true;
                 }
@@ -187,6 +205,22 @@ public class GroupManager {
             applyShared(b, targetGroup);
         }
 
+        // wall group: sync new member's hp with the existing fraction
+        if (isWall(building)) {
+            float totalMax = 0f;
+            for (Building b : targetGroup.members) totalMax += b.maxHealth;
+            float totalHp = targetGroup.wallHealthFraction * totalMax;
+            // new wall joins at full hp
+            totalHp += building.maxHealth;
+            totalMax += building.maxHealth;
+            if (totalMax > 0f) {
+                targetGroup.wallHealthFraction = Math.min(1f, totalHp / totalMax);
+            }
+            for (Building b : targetGroup.members) {
+                b.health = b.maxHealth * targetGroup.wallHealthFraction;
+            }
+        }
+
         refreshPower(targetGroup);
     }
 
@@ -211,7 +245,7 @@ public class GroupManager {
         ObjectSet<FactoryGroup> newGroups = new ObjectSet<>();
         for (Building b : allMembers) {
             if (getGroup(b) != null) continue;
-            newGroups.add(bfsAssign(b, allMembers));
+            newGroups.add(bfsAssign(b, allMembers, group.wallHealthFraction));
         }
 
         for (FactoryGroup g : newGroups) {
@@ -219,8 +253,10 @@ public class GroupManager {
         }
     }
 
-    private static FactoryGroup bfsAssign(Building start, ObjectSet<Building> candidates) {
+    private static FactoryGroup bfsAssign(Building start, ObjectSet<Building> candidates, float inheritedWallFraction) {
         FactoryGroup newGroup = new FactoryGroup();
+        newGroup.wallHealthFraction = inheritedWallFraction;
+
         Queue<Building> queue = new Queue<>();
         ObjectSet<Building> visited = new ObjectSet<>();
 
@@ -235,7 +271,6 @@ public class GroupManager {
 
             int size = current.block.size;
             int soff = current.block.sizeOffset;
-            boolean turret = isTurret(current);
             for (int dx = 0; dx < size; dx++) {
                 for (int dy = 0; dy < size; dy++) {
                     int tx = current.tile.x + soff + dx;
@@ -247,13 +282,20 @@ public class GroupManager {
                         Tile t = Vars.world.tile(nx, ny);
                         if (t == null || t.build == null) continue;
                         if (t.build == current) continue;
-                        if (turret ? !isTurret(t.build) : !isFactory(t.build)) continue;
+                        if (!sameKind(current, t.build)) continue;
                         if (visited.contains(t.build)) continue;
                         if (!candidates.contains(t.build)) continue;
                         visited.add(t.build);
                         queue.addLast(t.build);
                     }
                 }
+            }
+        }
+
+        // re-sync wall hp to the (possibly new) fraction
+        if (isWall(start)) {
+            for (Building b : newGroup.members) {
+                b.health = b.maxHealth * newGroup.wallHealthFraction;
             }
         }
         return newGroup;

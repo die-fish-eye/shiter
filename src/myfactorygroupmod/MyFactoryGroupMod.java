@@ -33,10 +33,8 @@ public class MyFactoryGroupMod extends Mod {
 
         Timer.schedule(() -> {
             GroupManager.cleanup();
-
             for (Building b : Groups.build) {
                 if (b == null || b.block == null) continue;
-                if (!b.block.hasItems && !b.block.hasLiquids) continue;
                 if (!GroupManager.isGroupable(b)) continue;
                 FactoryGroup g = GroupManager.getGroup(b);
                 if (g == null || GroupManager.hasForeignNeighbor(b)) {
@@ -49,6 +47,21 @@ public class MyFactoryGroupMod extends Mod {
     private void patchFactoryBuilds() {
         int patched = 0;
         for (Block b : Vars.content.blocks()) {
+
+            // === Wall (plain walls only, not ShieldWall subclasses) ===
+            if (b instanceof mindustry.world.blocks.defense.Wall wall) {
+                try {
+                    Building test = b.buildType.get();
+                    if (test.getClass().getName().equals(
+                            "mindustry.world.blocks.defense.Wall$WallBuild")) {
+                        b.buildType = () -> new GroupWallBuild(wall);
+                        patched++;
+                        Log.info("[fgm] replaced Wall: @", b.name);
+                    }
+                } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
+                continue;
+            }
+
             // === ItemTurret ===
             if (b instanceof mindustry.world.blocks.defense.turrets.ItemTurret it) {
                 try {
@@ -66,7 +79,6 @@ public class MyFactoryGroupMod extends Mod {
             }
 
             // === factory subclasses (specific -> general) ===
-
             if (b instanceof mindustry.world.blocks.production.Fracker fr) {
                 try {
                     Building test = b.buildType.get();
