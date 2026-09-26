@@ -81,6 +81,40 @@ public final class GroupSupport {
         return self.block.hasLiquids
             && self.liquids.get(liquid) < self.block.liquidCapacity * g.members.size;
     }
+    
+    /** 只向群外建筑 dump 液体，跳过同群，避免共享池自加自减产生数值漂移 */
+    public static void dumpLiquidFiltered(Building self, Liquid liquid, float scaling, int outputDir) {
+    if (self.liquids == null || self.liquids.get(liquid) <= 0.0001f) return;
+
+    FactoryGroup myG = GroupManager.getGroup(self);
+    int dump = self.cdump;
+
+    for (int i = 0; i < self.proximity.size; i++) {
+        self.incrementDump(self.proximity.size);
+        Building other = self.proximity.get((i + dump) % self.proximity.size);
+
+        if (outputDir != -1 && (outputDir + self.rotation) % 4 != self.relativeTo(other)) continue;
+
+        // 跳过同群
+        FactoryGroup otherG = GroupManager.getGroup(other);
+        if (myG != null && otherG == myG) continue;
+
+        other = other.getLiquidDestination(self, liquid);
+        if (other == null || !other.block.hasLiquids || !self.canDumpLiquid(other, liquid)
+                || other.liquids == null) continue;
+
+        // getLiquidDestination 可能返回同群的另一个成员，再查一次
+        FactoryGroup afterG = GroupManager.getGroup(other);
+        if (myG != null && afterG == myG) continue;
+
+        float ofract = other.liquids.get(liquid) / other.block.liquidCapacity;
+        float fract = self.liquids.get(liquid) / self.block.liquidCapacity;
+
+        if (ofract < fract) {
+            self.transferLiquid(other, (fract - ofract) * self.block.liquidCapacity / scaling, liquid);
+            }
+        }
+    }
 
     public static boolean dumpShared(Building self, Item item) {
         if (!self.block.hasItems || self.items == null || self.items.total() == 0

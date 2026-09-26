@@ -28,6 +28,15 @@ public class GroupPumpBuild extends Pump.PumpBuild {
     }
 
     @Override
+    public void dumpLiquid(Liquid liquid, float scaling, int outputDir) {
+        if (GroupManager.getGroup(this) != null) {
+            GroupSupport.dumpLiquidFiltered(this, liquid, scaling, outputDir);
+        } else {
+            super.dumpLiquid(liquid, scaling, outputDir);
+        }
+    }
+
+    @Override
     public boolean acceptItem(Building source, Item item) {
         if (GroupManager.getGroup(this) != null) {
             return GroupSupport.acceptItem(this, source, item);
