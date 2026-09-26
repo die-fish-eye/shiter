@@ -164,7 +164,7 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         Item cur = getEntryItem(ammo.peek());
         if (cur == null) return 0f;
         items = g.sharedItems;
-        return Math.min(1f, (float) items.get(cur) / Math.max(1, maxAmmo));
+        return Math.min(1f, (float) items.get(cur) / Math.max(1, ((ItemTurret) block).maxAmmo));
     }
 
     /** 炮塔不主动 dump 弹药 */
