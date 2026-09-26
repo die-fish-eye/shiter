@@ -1,7 +1,6 @@
 package myfactorygroupmod;
 
-import arc.math.Mathf;
-import mindustry.Vars;
+import arc.struct.Seq;
 import mindustry.gen.Building;
 import mindustry.gen.Call;
 import mindustry.world.blocks.defense.Wall;
@@ -12,48 +11,31 @@ public class GroupWallBuild extends Wall.WallBuild {
         wall.super();
     }
 
-    /** vanilla would deduct from local health; we route all damage through the group pool */
+    /** hook into vanilla damage pipeline: return value is subtracted from this wall's health */
     @Override
     public float handleDamage(float amount) {
         FactoryGroup g = GroupManager.getWallGroup(this);
         if (g == null || g.members.size <= 1) return amount;
-        return 0f;
-    }
 
-    @Override
-    public void damage(float amount) {
-        if (dead()) return;
-
-        FactoryGroup g = GroupManager.getWallGroup(this);
-        if (g == null || g.members.size <= 1) {
-            super.damage(amount);
-            return;
-        }
-
-        // apply vanilla block-health rule
-        float dm = Vars.state.rules.blockHealth(team);
-        if (Mathf.zero(dm)) {
-            g.wallHealthFraction = 0f;
-        } else {
-            amount /= dm;
-        }
-
-        // total max hp of the group
         float totalMax = 0f;
         for (Building b : g.members) totalMax += b.maxHealth;
-        if (totalMax <= 0f) return;
+        if (totalMax <= 0f) return 0f;
 
-        // deduct from group pool
-        g.wallHealthFraction = Math.max(0f, g.wallHealthFraction - amount / totalMax);
+        float oldFrac = g.wallHealthFraction;
+        float newFrac = Math.max(0f, oldFrac - amount / totalMax);
+        g.wallHealthFraction = newFrac;
 
-        // sync each member's health
+        // sync other members
         for (Building b : g.members) {
-            b.health = b.maxHealth * g.wallHealthFraction;
+            if (b != this) b.health = b.maxHealth * newFrac;
         }
 
-        // if group pool is empty, kill every wall at once
-        if (g.wallHealthFraction <= 0f) {
-            arc.struct.Seq<Building> snapshot = g.members.toSeq();
+        // sync self, then return 0 so vanilla doesn't subtract again
+        health = maxHealth * newFrac;
+
+        // group wiped: bring down every wall at once
+        if (newFrac <= 0f) {
+            Seq<Building> snapshot = g.members.toSeq();
             for (Building b : snapshot) {
                 if (b.isValid() && !b.dead()) {
                     b.health = 0f;
@@ -61,5 +43,7 @@ public class GroupWallBuild extends Wall.WallBuild {
                 }
             }
         }
+
+        return 0f;
     }
 }

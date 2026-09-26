@@ -48,17 +48,30 @@ public class MyFactoryGroupMod extends Mod {
         int patched = 0;
         for (Block b : Vars.content.blocks()) {
 
-            // === Wall (plain walls only, not ShieldWall subclasses) ===
+            // === Wall: dual-condition match, with diagnostics ===
             if (b instanceof mindustry.world.blocks.defense.Wall wall) {
                 try {
                     Building test = b.buildType.get();
-                    if (test.getClass().getName().equals(
-                            "mindustry.world.blocks.defense.Wall$WallBuild")) {
+                    Class<?> cls = test.getClass();
+                    Class<?> enclosing = cls.getEnclosingClass();
+                    String clsName = cls.getName();
+                    String encName = enclosing == null ? "null" : enclosing.getName();
+
+                    Log.info("[fgm] Wall candidate: @ cls=@ enc=@",
+                        b.name, clsName, encName);
+
+                    boolean isPlainWall =
+                        clsName.equals("mindustry.world.blocks.defense.Wall$WallBuild")
+                        || enclosing == mindustry.world.blocks.defense.Wall.class;
+
+                    if (isPlainWall) {
                         b.buildType = () -> new GroupWallBuild(wall);
                         patched++;
                         Log.info("[fgm] replaced Wall: @", b.name);
                     }
-                } catch (Throwable t) { Log.warn("[fgm] @: @", b.name, t.getMessage()); }
+                } catch (Throwable t) {
+                    Log.warn("[fgm] @: @", b.name, t.getMessage());
+                }
                 continue;
             }
 
@@ -78,7 +91,7 @@ public class MyFactoryGroupMod extends Mod {
                 continue;
             }
 
-            // === factory subclasses (specific -> general) ===
+            // === factory subclasses ===
             if (b instanceof mindustry.world.blocks.production.Fracker fr) {
                 try {
                     Building test = b.buildType.get();
