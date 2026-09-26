@@ -44,6 +44,12 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         turret.super();
     }
 
+    /** 真正在共享群里（成员 > 1）才走群逻辑，单炮塔走原版 */
+    private boolean inSharedGroup() {
+        FactoryGroup g = GroupManager.getGroup(this);
+        return g != null && g.members.size > 1;
+    }
+
     private Turret.AmmoEntry makeEntry(Item item, int amount) {
         if (itemEntryCtor == null) return null;
         try {
@@ -62,7 +68,6 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         }
     }
 
-    /** 判断物品是否是群内任何炮塔的弹药类型 */
     private boolean isGroupAmmoType(FactoryGroup g, Item item) {
         for (Building b : g.members) {
             if (b.block instanceof ItemTurret it && it.ammoTypes.get(item) != null) {
@@ -72,7 +77,6 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         return false;
     }
 
-    /** 决定当前该用哪种弹药 */
     private Item resolveAmmo(FactoryGroup g) {
         ItemTurret turret = (ItemTurret) block;
 
@@ -118,9 +122,13 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public void updateTile() {
+        if (!inSharedGroup()) {
+            super.updateTile();
+            return;
+        }
         GroupSupport.redirectModules(this);
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g != null) syncAmmo(g);
+        syncAmmo(g);
         super.updateTile();
     }
 
@@ -128,8 +136,8 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public boolean hasAmmo() {
+        if (!inSharedGroup()) return super.hasAmmo();
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g == null) return super.hasAmmo();
         if (!canConsume()) return false;
         if (cheating()) return true;
         items = g.sharedItems;
@@ -140,8 +148,8 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public BulletType useAmmo() {
+        if (!inSharedGroup()) return super.useAmmo();
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g == null) return super.useAmmo();
         if (cheating()) return peekAmmo();
 
         items = g.sharedItems;
@@ -158,8 +166,8 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public BulletType peekAmmo() {
+        if (!inSharedGroup()) return super.peekAmmo();
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g == null) return super.peekAmmo();
         items = g.sharedItems;
         Item target = resolveAmmo(g);
         return target == null ? null : ((ItemTurret) block).ammoTypes.get(target);
@@ -167,8 +175,8 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public float getAmmoFraction() {
+        if (!inSharedGroup()) return super.getAmmoFraction();
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g == null) return super.getAmmoFraction();
         items = g.sharedItems;
         Item target = resolveAmmo(g);
         if (target == null) return 0f;
@@ -180,39 +188,36 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public boolean acceptItem(Building source, Item item) {
+        if (!inSharedGroup()) return super.acceptItem(source, item);
         FactoryGroup g = GroupManager.getGroup(this);
-        if (g == null) return super.acceptItem(source, item);
-        // 群内任何一个炮塔的弹药类型都接受
         if (!isGroupAmmoType(g, item)) return false;
         items = g.sharedItems;
         return items.get(item) < getMaximumAccepted(item);
     }
 
-    /** 容量用 maxAmmo，而不是 block.itemCapacity */
     @Override
     public int getMaximumAccepted(Item item) {
         FactoryGroup g = GroupManager.getGroup(this);
         int maxA = ((ItemTurret) block).maxAmmo;
-        if (g == null || g.members.size <= 0) return maxA;
+        if (g == null || g.members.size <= 1) return maxA;
         return maxA * g.members.size;
     }
 
     @Override
     public void handleItem(Building source, Item item) {
-        FactoryGroup g = GroupManager.getGroup(this);
-        if (g == null) {
+        if (!inSharedGroup()) {
             super.handleItem(source, item);
             return;
         }
+        FactoryGroup g = GroupManager.getGroup(this);
         items = g.sharedItems;
         items.add(item, 1);
         lastSyncedAmount = -1;
     }
 
-    /** 炮塔不主动 dump 弹药 */
     @Override
     public boolean dump(Item item) {
-        if (GroupManager.getGroup(this) != null) return false;
+        if (inSharedGroup()) return false;
         return super.dump(item);
     }
 
@@ -220,8 +225,7 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public void buildConfiguration(Table table) {
-        // 不在群里：原版没有配置 UI，这里是空实现
-        if (GroupManager.getGroup(this) == null) {
+        if (!inSharedGroup()) {
             super.buildConfiguration(table);
             return;
         }
@@ -246,22 +250,22 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         });
     }
 
-    /** 群内才显示配置，单炮塔沿用原版行为 */
+    /** 群内才弹配置，单炮塔沿用原版 */
     @Override
     public boolean shouldShowConfigure(Player player) {
-        return GroupManager.getGroup(this) != null;
+        return inSharedGroup();
     }
 
     @Override
     public boolean configTapped() {
-        return GroupManager.getGroup(this) != null;
+        return inSharedGroup();
     }
 
     // ===== 液体 =====
 
     @Override
     public boolean acceptLiquid(Building source, Liquid liquid) {
-        if (GroupManager.getGroup(this) != null) {
+        if (inSharedGroup()) {
             return GroupSupport.acceptLiquid(this, source, liquid);
         }
         return super.acceptLiquid(source, liquid);
@@ -269,7 +273,7 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public void dumpLiquid(Liquid liquid, float scaling, int outputDir) {
-        if (GroupManager.getGroup(this) != null) {
+        if (inSharedGroup()) {
             GroupSupport.dumpLiquidFiltered(this, liquid, scaling, outputDir);
         } else {
             super.dumpLiquid(liquid, scaling, outputDir);
