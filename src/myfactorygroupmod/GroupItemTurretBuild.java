@@ -9,6 +9,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import mindustry.entities.bullet.BulletType;
 import mindustry.gen.Building;
+import mindustry.gen.Player;
 import mindustry.graphics.Pal;
 import mindustry.type.Item;
 import mindustry.type.Liquid;
@@ -75,14 +76,12 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
     private Item resolveAmmo(FactoryGroup g) {
         ItemTurret turret = (ItemTurret) block;
 
-        // 1. 玩家选的
         if (selectedAmmo != null
                 && turret.ammoTypes.get(selectedAmmo) != null
                 && items.get(selectedAmmo) > 0) {
             return selectedAmmo;
         }
 
-        // 2. 保留当前 ammo 队列的
         if (ammo.size > 0) {
             Item cur = getEntryItem(ammo.peek());
             if (cur != null && turret.ammoTypes.get(cur) != null && items.get(cur) > 0) {
@@ -90,7 +89,6 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
             }
         }
 
-        // 3. 共享池里任选一个自己能用的
         for (Item it : turret.ammoTypes.keys()) {
             if (items.get(it) > 0) return it;
         }
@@ -178,7 +176,7 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         return Math.min(1f, (float) items.get(target) / Math.max(1, maxA));
     }
 
-    // ===== 物品接收：白名单改为群内所有炮塔的弹药 ====
+    // ===== 物品接收 =====
 
     @Override
     public boolean acceptItem(Building source, Item item) {
@@ -190,9 +188,13 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         return items.get(item) < getMaximumAccepted(item);
     }
 
+    /** 容量用 maxAmmo，而不是 block.itemCapacity */
     @Override
     public int getMaximumAccepted(Item item) {
-        return GroupSupport.getMaxAccepted(this, item);
+        FactoryGroup g = GroupManager.getGroup(this);
+        int maxA = ((ItemTurret) block).maxAmmo;
+        if (g == null || g.members.size <= 0) return maxA;
+        return maxA * g.members.size;
     }
 
     @Override
@@ -202,7 +204,6 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
             super.handleItem(source, item);
             return;
         }
-        // 不再拒绝非自己弹药类型：进共享池就行
         items = g.sharedItems;
         items.add(item, 1);
         lastSyncedAmount = -1;
@@ -219,6 +220,7 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
 
     @Override
     public void buildConfiguration(Table table) {
+        // 不在群里：原版没有配置 UI，这里是空实现
         if (GroupManager.getGroup(this) == null) {
             super.buildConfiguration(table);
             return;
@@ -244,9 +246,15 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         });
     }
 
+    /** 群内才显示配置，单炮塔沿用原版行为 */
     @Override
-    public boolean shouldShowConfigure(mindustry.gen.Player player) {
-        return true;
+    public boolean shouldShowConfigure(Player player) {
+        return GroupManager.getGroup(this) != null;
+    }
+
+    @Override
+    public boolean configTapped() {
+        return GroupManager.getGroup(this) != null;
     }
 
     // ===== 液体 =====
