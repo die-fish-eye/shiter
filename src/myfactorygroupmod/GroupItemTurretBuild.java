@@ -61,6 +61,16 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         }
     }
 
+    /** 判断物品是否是群内任何炮塔的弹药类型 */
+    private boolean isGroupAmmoType(FactoryGroup g, Item item) {
+        for (Building b : g.members) {
+            if (b.block instanceof ItemTurret it && it.ammoTypes.get(item) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** 决定当前该用哪种弹药 */
     private Item resolveAmmo(FactoryGroup g) {
         ItemTurret turret = (ItemTurret) block;
@@ -80,7 +90,7 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
             }
         }
 
-        // 3. 共享池里任选一个
+        // 3. 共享池里任选一个自己能用的
         for (Item it : turret.ammoTypes.keys()) {
             if (items.get(it) > 0) return it;
         }
@@ -168,13 +178,14 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
         return Math.min(1f, (float) items.get(target) / Math.max(1, maxA));
     }
 
-    // ===== 物品接收 =====
+    // ===== 物品接收：白名单改为群内所有炮塔的弹药 ====
 
     @Override
     public boolean acceptItem(Building source, Item item) {
         FactoryGroup g = GroupManager.getGroup(this);
         if (g == null) return super.acceptItem(source, item);
-        if (((ItemTurret) block).ammoTypes.get(item) == null) return false;
+        // 群内任何一个炮塔的弹药类型都接受
+        if (!isGroupAmmoType(g, item)) return false;
         items = g.sharedItems;
         return items.get(item) < getMaximumAccepted(item);
     }
@@ -191,7 +202,7 @@ public class GroupItemTurretBuild extends ItemTurret.ItemTurretBuild {
             super.handleItem(source, item);
             return;
         }
-        if (((ItemTurret) block).ammoTypes.get(item) == null) return;
+        // 不再拒绝非自己弹药类型：进共享池就行
         items = g.sharedItems;
         items.add(item, 1);
         lastSyncedAmount = -1;
