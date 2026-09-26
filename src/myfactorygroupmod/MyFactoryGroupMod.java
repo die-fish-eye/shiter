@@ -49,12 +49,16 @@ public class MyFactoryGroupMod extends Mod {
     private void patchFactoryBuilds() {
         int patched = 0;
         for (Block b : Vars.content.blocks()) {
-            // === ItemTurret 优先（独立炮塔群）===
+            // === ItemTurret ===
             if (b instanceof mindustry.world.blocks.defense.turrets.ItemTurret it) {
                 try {
                     Building test = b.buildType.get();
                     if (test.getClass().getName().endsWith("$ItemTurretBuild")) {
                         b.buildType = () -> new GroupItemTurretBuild(it);
+                        // 让炮塔可以点击弹出配置 UI
+                        it.configurable = true;
+                        it.selectionRows = 5;
+                        it.selectionColumns = 4;
                         patched++;
                         Log.info("[fgm] 已替换 ItemTurret: @", b.name);
                     }
