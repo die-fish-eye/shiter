@@ -10,10 +10,13 @@ import mindustry.world.Tile;
 public class GroupManager {
 
     private static final ObjectMap<Building, FactoryGroup> buildingToGroup = new ObjectMap<>();
+    private static final ObjectMap<Building, FactoryGroup> turretToGroup = new ObjectMap<>();
     private static final int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
 
-    public static FactoryGroup getGroup(Building building) {
-        return buildingToGroup.get(building);
+    public static FactoryGroup getGroup(Building b) {
+        FactoryGroup g = buildingToGroup.get(b);
+        if (g != null) return g;
+        return turretToGroup.get(b);
     }
 
     public static boolean isFactory(Building b) {
@@ -29,6 +32,24 @@ public class GroupManager {
             || b instanceof GroupSolidPumpBuild
             || b instanceof GroupFrackerBuild
             || b instanceof GroupAttributeCrafterBuild;
+    }
+
+    public static boolean isTurret(Building b) {
+        return b instanceof GroupItemTurretBuild;
+    }
+
+    public static boolean isGroupable(Building b) {
+        return isFactory(b) || isTurret(b);
+    }
+
+    private static void setGroup(Building b, FactoryGroup g) {
+        if (isTurret(b)) turretToGroup.put(b, g);
+        else buildingToGroup.put(b, g);
+    }
+
+    private static void removeGroup(Building b) {
+        turretToGroup.remove(b);
+        buildingToGroup.remove(b);
     }
 
     private static void applyShared(Building b, FactoryGroup group) {
@@ -49,8 +70,18 @@ public class GroupManager {
 
     public static boolean cleanup() {
         boolean changed = false;
-        ObjectMap<Building, FactoryGroup> copy = new ObjectMap<>(buildingToGroup);
-        for (ObjectMap.Entry<Building, FactoryGroup> e : copy) {
+
+        ObjectMap<Building, FactoryGroup> copy1 = new ObjectMap<>(buildingToGroup);
+        for (ObjectMap.Entry<Building, FactoryGroup> e : copy1) {
+            Building b = e.key;
+            if (b == null || !isAlive(b)) {
+                onBuildingRemoved(b);
+                changed = true;
+            }
+        }
+
+        ObjectMap<Building, FactoryGroup> copy2 = new ObjectMap<>(turretToGroup);
+        for (ObjectMap.Entry<Building, FactoryGroup> e : copy2) {
             Building b = e.key;
             if (b == null || !isAlive(b)) {
                 onBuildingRemoved(b);
@@ -65,10 +96,10 @@ public class GroupManager {
         return b.tile.build == b;
     }
 
-    /** 计算建筑占据的所有格子并向外扩展一格，返回相邻工厂 */
     private static void enqueueNeighbors(Building b, Queue<Building> queue, ObjectSet<Building> visited) {
         int size = b.block.size;
         int soff = b.block.sizeOffset;
+        boolean turret = isTurret(b);
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
                 int tx = b.tile.x + soff + dx;
@@ -80,7 +111,7 @@ public class GroupManager {
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
-                    if (!isFactory(t.build)) continue;
+                    if (turret ? !isTurret(t.build) : !isFactory(t.build)) continue;
                     if (visited.contains(t.build)) continue;
                     visited.add(t.build);
                     queue.addLast(t.build);
@@ -90,11 +121,12 @@ public class GroupManager {
     }
 
     public static boolean hasForeignNeighbor(Building b) {
-        if (!isFactory(b)) return false;
-        FactoryGroup myGroup = buildingToGroup.get(b);
+        if (!isGroupable(b)) return false;
+        FactoryGroup myGroup = getGroup(b);
         if (myGroup == null) return true;
         int size = b.block.size;
         int soff = b.block.sizeOffset;
+        boolean turret = isTurret(b);
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
                 int tx = b.tile.x + soff + dx;
@@ -106,8 +138,8 @@ public class GroupManager {
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
-                    if (!isFactory(t.build)) continue;
-                    FactoryGroup otherGroup = buildingToGroup.get(t.build);
+                    if (turret ? !isTurret(t.build) : !isFactory(t.build)) continue;
+                    FactoryGroup otherGroup = getGroup(t.build);
                     if (otherGroup != myGroup) return true;
                 }
             }
@@ -116,7 +148,7 @@ public class GroupManager {
     }
 
     public static void onBuildingPlaced(Building building) {
-        if (!isFactory(building)) return;
+        if (!isGroupable(building)) return;
 
         Queue<Building> queue = new Queue<>();
         ObjectSet<Building> visited = new ObjectSet<>();
@@ -127,7 +159,7 @@ public class GroupManager {
 
         while (queue.size > 0) {
             Building current = queue.removeFirst();
-            FactoryGroup existing = buildingToGroup.get(current);
+            FactoryGroup existing = getGroup(current);
             if (existing != null) foundGroups.add(existing);
             enqueueNeighbors(current, queue, visited);
         }
@@ -139,8 +171,9 @@ public class GroupManager {
             targetGroup = foundGroups.first();
             for (FactoryGroup other : foundGroups) {
                 if (other == targetGroup) continue;
-                for (Building b : other.members) {
-                    buildingToGroup.put(b, targetGroup);
+                arc.struct.Seq<Building> snapshot = other.members.toSeq();
+                for (Building b : snapshot) {
+                    setGroup(b, targetGroup);
                     targetGroup.members.add(b);
                 }
                 targetGroup.absorbItems(other);
@@ -150,7 +183,7 @@ public class GroupManager {
 
         for (Building b : visited) {
             targetGroup.add(b);
-            buildingToGroup.put(b, targetGroup);
+            setGroup(b, targetGroup);
             applyShared(b, targetGroup);
         }
 
@@ -159,11 +192,11 @@ public class GroupManager {
 
     public static void onBuildingRemoved(Building building) {
         if (building == null) return;
-        FactoryGroup group = buildingToGroup.get(building);
+        FactoryGroup group = getGroup(building);
         if (group == null) return;
 
         group.remove(building);
-        buildingToGroup.remove(building);
+        removeGroup(building);
 
         if (group.isEmpty()) return;
 
@@ -171,13 +204,13 @@ public class GroupManager {
         allMembers.addAll(group.members);
 
         for (Building b : group.members) {
-            buildingToGroup.remove(b);
+            removeGroup(b);
         }
         group.members.clear();
 
         ObjectSet<FactoryGroup> newGroups = new ObjectSet<>();
         for (Building b : allMembers) {
-            if (buildingToGroup.containsKey(b)) continue;
+            if (getGroup(b) != null) continue;
             newGroups.add(bfsAssign(b, allMembers));
         }
 
@@ -197,11 +230,12 @@ public class GroupManager {
         while (queue.size > 0) {
             Building current = queue.removeFirst();
             newGroup.add(current);
-            buildingToGroup.put(current, newGroup);
+            setGroup(current, newGroup);
             applyShared(current, newGroup);
 
             int size = current.block.size;
             int soff = current.block.sizeOffset;
+            boolean turret = isTurret(current);
             for (int dx = 0; dx < size; dx++) {
                 for (int dy = 0; dy < size; dy++) {
                     int tx = current.tile.x + soff + dx;
@@ -213,7 +247,7 @@ public class GroupManager {
                         Tile t = Vars.world.tile(nx, ny);
                         if (t == null || t.build == null) continue;
                         if (t.build == current) continue;
-                        if (!isFactory(t.build)) continue;
+                        if (turret ? !isTurret(t.build) : !isFactory(t.build)) continue;
                         if (visited.contains(t.build)) continue;
                         if (!candidates.contains(t.build)) continue;
                         visited.add(t.build);
