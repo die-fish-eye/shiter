@@ -12,27 +12,31 @@ public class GroupWallBuild extends Wall.WallBuild {
         wall.super();
     }
 
-    /** 拦截伤害：所有伤害都从群共享血池扣除，自己返回 0 让原版不再扣血 */
+    /** 把比例同步到所有成员 */
+    private void syncHealth(FactoryGroup g, float frac) {
+        g.wallHealthFraction = frac;
+        for (Building b : g.members) {
+            b.health = b.maxHealth * frac;
+        }
+    }
+
+    private float totalMax(FactoryGroup g) {
+        float t = 0f;
+        for (Building b : g.members) t += b.maxHealth;
+        return t;
+    }
+
+    /** 拦截伤害：从群共享血池扣，返回 0 让原版不再扣自己的血 */
     @Override
     public float handleDamage(float amount) {
         FactoryGroup g = GroupManager.getWallGroup(this);
         if (g == null || g.members.size <= 1) return amount;
 
-        float totalMax = 0f;
-        for (Building b : g.members) totalMax += b.maxHealth;
-        if (totalMax <= 0f) return 0f;
+        float tm = totalMax(g);
+        if (tm <= 0f) return 0f;
 
-        float oldFrac = g.wallHealthFraction;
-        float newFrac = Math.max(0f, oldFrac - amount / totalMax);
-        g.wallHealthFraction = newFrac;
-
-        // 同步其他成员血量
-        for (Building b : g.members) {
-            if (b != this) b.health = b.maxHealth * newFrac;
-        }
-
-        // 同步自己，返回 0 表示原版不再额外扣血
-        health = maxHealth * newFrac;
+        float newFrac = Math.max(0f, g.wallHealthFraction - amount / tm);
+        syncHealth(g, newFrac);
 
         // 群血量归零：所有墙一起倒
         if (newFrac <= 0f) {
@@ -44,8 +48,33 @@ public class GroupWallBuild extends Wall.WallBuild {
                 }
             }
         }
-
         return 0f;
+    }
+
+    /** 治疗也走群共享血池 */
+    @Override
+    public void heal(float amount) {
+        FactoryGroup g = GroupManager.getWallGroup(this);
+        if (g == null || g.members.size <= 1) {
+            super.heal(amount);
+            return;
+        }
+        float tm = totalMax(g);
+        if (tm <= 0f) return;
+
+        float newFrac = Math.min(1f, g.wallHealthFraction + amount / tm);
+        syncHealth(g, newFrac);
+    }
+
+    /** 无参 heal()（全恢复）也走群血池 */
+    @Override
+    public void heal() {
+        FactoryGroup g = GroupManager.getWallGroup(this);
+        if (g == null || g.members.size <= 1) {
+            super.heal();
+            return;
+        }
+        syncHealth(g, 1f);
     }
 
     @Override
