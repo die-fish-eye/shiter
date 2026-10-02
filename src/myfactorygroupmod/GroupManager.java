@@ -10,65 +10,65 @@ import mindustry.world.Tile;
 
 public class GroupManager {
 
-    private static final ObjectMap<Building, FactoryGroup> buildingToGroup = new ObjectMap<>();
-    private static final ObjectMap<Building, FactoryGroup> turretToGroup = new ObjectMap<>();
-    private static final ObjectMap<Building, FactoryGroup> wallToGroup = new ObjectMap<>();
+    /** 群引用现在直接挂在建筑字段上（见 GroupBuild.fgmGroup()），
+     *  这张表只用于“需要遍历所有已入群建筑”的场景（cleanup 兜底清理）。 */
+    private static final ObjectMap<Building, FactoryGroup> groupByBuilding = new ObjectMap<>();
     private static final int[][] DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
 
-    public static FactoryGroup getGroup(Building b) {
-        FactoryGroup g = buildingToGroup.get(b);
-        if (g != null) return g;
-        g = turretToGroup.get(b);
-        if (g != null) return g;
-        return wallToGroup.get(b);
-    }
+    /** cleanup 的临时收集器，复用以避免每次分配。 */
+    private static final ObjectSet<Building> deadScratch = new ObjectSet<>();
 
-    public static FactoryGroup getWallGroup(Building b) {
-        return wallToGroup.get(b);
+    public static FactoryGroup getGroup(Building b) {
+        return b instanceof GroupBuild gb ? gb.fgmGroup() : null;
     }
 
     public static boolean isFactory(Building b) {
-        return b instanceof GroupCrafterBuild
-            || b instanceof GroupSeparatorBuild
-            || b instanceof GroupDrillBuild
-            || b instanceof GroupConsumeGeneratorBuild
-            || b instanceof GroupHeaterGeneratorBuild
-            || b instanceof GroupImpactReactorBuild
-            || b instanceof GroupVariableReactorBuild
-            || b instanceof GroupNuclearReactorBuild
-            || b instanceof GroupPumpBuild
-            || b instanceof GroupSolidPumpBuild
-            || b instanceof GroupFrackerBuild
-            || b instanceof GroupAttributeCrafterBuild;
+        return b instanceof GroupFactoryBuild;
     }
 
     public static boolean isTurret(Building b) {
-        return b instanceof GroupItemTurretBuild;
+        return b instanceof GroupTurretBuild;
     }
 
     public static boolean isWall(Building b) {
-        return b instanceof GroupWallBuild;
+        return b instanceof GroupWallMember;
     }
 
     public static boolean isGroupable(Building b) {
-        return isFactory(b) || isTurret(b) || isWall(b);
+        return b instanceof GroupBuild;
+    }
+
+    /**
+     * 邻居是否与本建筑同类。墙/炮塔/工厂互相隔离，不合并。
+     */
+    private static boolean sameKind(Building a, Building b) {
+        if (a instanceof GroupWallMember) return b instanceof GroupWallMember;
+        if (a instanceof GroupTurretBuild) return b instanceof GroupTurretBuild;
+        return b instanceof GroupFactoryBuild;
     }
 
     private static void setGroup(Building b, FactoryGroup g) {
-        if (isWall(b)) wallToGroup.put(b, g);
-        else if (isTurret(b)) turretToGroup.put(b, g);
-        else buildingToGroup.put(b, g);
+        if (b instanceof GroupBuild gb) gb.fgmGroup(g);
+        groupByBuilding.put(b, g);
     }
 
     private static void removeGroup(Building b) {
-        wallToGroup.remove(b);
-        turretToGroup.remove(b);
-        buildingToGroup.remove(b);
+        if (b instanceof GroupBuild gb) gb.fgmGroup(null);
+        groupByBuilding.remove(b);
     }
 
-    /** 墙只共享血量，不共享物品/液体 */
+    /** 世界重载时清空所有引用。 */
+    public static void reset() {
+        for (ObjectMap.Entry<Building, FactoryGroup> e : groupByBuilding) {
+            if (e.key instanceof GroupBuild gb) gb.fgmGroup(null);
+        }
+        groupByBuilding.clear();
+        deadScratch.clear();
+    }
+
     private static void applyShared(Building b, FactoryGroup group) {
-        if (isWall(b)) return;
+        // 墙只共享血量，不共享物品/液体
+        if (b instanceof GroupWallMember) return;
         if (b.items != group.sharedItems) b.items = group.sharedItems;
         if (b.block.hasLiquids && b.liquids != group.sharedLiquids) {
             b.liquids = group.sharedLiquids;
@@ -76,51 +76,56 @@ public class GroupManager {
     }
 
     private static void refreshPower(FactoryGroup group) {
-        arc.struct.Seq<Building> snapshot = group.members.toSeq();
-        for (Building b : snapshot) {
+        // 直接遍历，不再 members.toSeq()：这里不存在成员变动，无需快照
+        for (Building b : group.members) {
             if (b != null && b.power != null && b.isValid()) {
                 b.updatePowerGraph();
             }
         }
     }
 
+    /**
+     * 清理已经不在世界里的建筑。
+     * 不再复制整张表：遍历时只收集死键，遍历结束后再统一处理。
+     */
     public static boolean cleanup() {
+        deadScratch.clear();
         boolean changed = false;
-        changed |= cleanupMap(buildingToGroup);
-        changed |= cleanupMap(turretToGroup);
-        changed |= cleanupMap(wallToGroup);
-        return changed;
-    }
+        boolean nullKey = false;
 
-    private static boolean cleanupMap(ObjectMap<Building, FactoryGroup> map) {
-        boolean changed = false;
-        ObjectMap<Building, FactoryGroup> copy = new ObjectMap<>(map);
-        for (ObjectMap.Entry<Building, FactoryGroup> e : copy) {
+        for (ObjectMap.Entry<Building, FactoryGroup> e : groupByBuilding) {
             Building b = e.key;
-            if (b == null || !isAlive(b)) {
-                onBuildingRemoved(b);
+            if (b == null) nullKey = true;
+            else if (!isAlive(b)) {
+                deadScratch.add(b);
                 changed = true;
             }
         }
+
+        if (nullKey) {
+            groupByBuilding.remove(null);
+        }
+
+        if (deadScratch.size > 0) {
+            for (Building b : deadScratch) {
+                onBuildingRemoved(b);
+            }
+            deadScratch.clear();
+        }
+
         return changed;
     }
 
     private static boolean isAlive(Building b) {
-        if (b == null) return false;
         if (b.tile == null) return false;
         return b.tile.build == b;
-    }
-
-    /** 同类才进同一个群：墙/炮塔/工厂互相隔离 */
-    private static boolean sameKind(Building a, Building b) {
-        if (isWall(a)) return isWall(b);
-        if (isTurret(a)) return isTurret(b);
-        return isFactory(b);
     }
 
     private static void enqueueNeighbors(Building b, Queue<Building> queue, ObjectSet<Building> visited) {
         int size = b.block.size;
         int soff = b.block.sizeOffset;
+        int worldW = Vars.world.width();
+        int worldH = Vars.world.height();
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
                 int tx = b.tile.x + soff + dx;
@@ -128,7 +133,7 @@ public class GroupManager {
                 for (int[] d : DIRS) {
                     int nx = tx + d[0];
                     int ny = ty + d[1];
-                    if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
+                    if (nx < 0 || ny < 0 || nx >= worldW || ny >= worldH) continue;
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
@@ -147,6 +152,8 @@ public class GroupManager {
         if (myGroup == null) return true;
         int size = b.block.size;
         int soff = b.block.sizeOffset;
+        int worldW = Vars.world.width();
+        int worldH = Vars.world.height();
         for (int dx = 0; dx < size; dx++) {
             for (int dy = 0; dy < size; dy++) {
                 int tx = b.tile.x + soff + dx;
@@ -154,7 +161,7 @@ public class GroupManager {
                 for (int[] d : DIRS) {
                     int nx = tx + d[0];
                     int ny = ty + d[1];
-                    if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
+                    if (nx < 0 || ny < 0 || nx >= worldW || ny >= worldH) continue;
                     Tile t = Vars.world.tile(nx, ny);
                     if (t == null || t.build == null) continue;
                     if (t.build == b) continue;
@@ -191,10 +198,9 @@ public class GroupManager {
             targetGroup = foundGroups.first();
             for (FactoryGroup other : foundGroups) {
                 if (other == targetGroup) continue;
-                arc.struct.Seq<Building> snapshot = other.members.toSeq();
-                for (Building b : snapshot) {
+                for (Building b : other.members) {
                     setGroup(b, targetGroup);
-                    targetGroup.members.add(b);
+                    targetGroup.add(b);
                 }
                 targetGroup.absorbItems(other);
                 targetGroup.absorbLiquids(other);
@@ -208,7 +214,7 @@ public class GroupManager {
         }
 
         // 墙群：把当前所有成员的现有血量相加，重算比例，然后统一同步
-        if (isWall(building)) {
+        if (building instanceof GroupWallMember) {
             float totalMax = 0f;
             float totalHp = 0f;
             for (Building b : targetGroup.members) {
@@ -242,7 +248,7 @@ public class GroupManager {
         for (Building b : group.members) {
             removeGroup(b);
         }
-        group.members.clear();
+        group.clear();
 
         ObjectSet<FactoryGroup> newGroups = new ObjectSet<>();
         for (Building b : allMembers) {
@@ -273,6 +279,8 @@ public class GroupManager {
 
             int size = current.block.size;
             int soff = current.block.sizeOffset;
+            int worldW = Vars.world.width();
+            int worldH = Vars.world.height();
             for (int dx = 0; dx < size; dx++) {
                 for (int dy = 0; dy < size; dy++) {
                     int tx = current.tile.x + soff + dx;
@@ -280,7 +288,7 @@ public class GroupManager {
                     for (int[] d : DIRS) {
                         int nx = tx + d[0];
                         int ny = ty + d[1];
-                        if (nx < 0 || ny < 0 || nx >= Vars.world.width() || ny >= Vars.world.height()) continue;
+                        if (nx < 0 || ny < 0 || nx >= worldW || ny >= worldH) continue;
                         Tile t = Vars.world.tile(nx, ny);
                         if (t == null || t.build == null) continue;
                         if (t.build == current) continue;
@@ -295,7 +303,7 @@ public class GroupManager {
         }
 
         // 墙群拆分后，按继承的比例同步血量
-        if (isWall(start)) {
+        if (start instanceof GroupWallMember) {
             for (Building b : newGroup.members) {
                 b.health = b.maxHealth * newGroup.wallHealthFraction;
             }

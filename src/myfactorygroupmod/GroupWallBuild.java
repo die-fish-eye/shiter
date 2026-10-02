@@ -6,7 +6,19 @@ import mindustry.gen.Building;
 import mindustry.gen.Call;
 import mindustry.world.blocks.defense.Wall;
 
-public class GroupWallBuild extends Wall.WallBuild {
+public class GroupWallBuild extends Wall.WallBuild implements GroupWallMember {
+
+    private FactoryGroup groupRef;
+
+    @Override
+    public FactoryGroup fgmGroup() {
+        return groupRef;
+    }
+
+    @Override
+    public void fgmGroup(FactoryGroup group) {
+        groupRef = group;
+    }
 
     public GroupWallBuild(Wall wall) {
         wall.super();
@@ -29,7 +41,7 @@ public class GroupWallBuild extends Wall.WallBuild {
     /** 拦截伤害：从群共享血池扣，返回 0 让原版不再扣自己的血 */
     @Override
     public float handleDamage(float amount) {
-        FactoryGroup g = GroupManager.getWallGroup(this);
+        FactoryGroup g = GroupManager.getGroup(this);
         if (g == null || g.members.size <= 1) return amount;
 
         float tm = totalMax(g);
@@ -44,7 +56,7 @@ public class GroupWallBuild extends Wall.WallBuild {
             for (Building b : snapshot) {
                 if (b.isValid() && !b.dead()) {
                     b.health = 0f;
-                    Call.buildDestroyed((Building) b);
+                    Call.buildDestroyed(b);
                 }
             }
         }
@@ -54,14 +66,13 @@ public class GroupWallBuild extends Wall.WallBuild {
     /** 治疗也走群共享血池 */
     @Override
     public void heal(float amount) {
-        FactoryGroup g = GroupManager.getWallGroup(this);
+        FactoryGroup g = GroupManager.getGroup(this);
         if (g == null || g.members.size <= 1) {
             super.heal(amount);
             return;
         }
         float tm = totalMax(g);
         if (tm <= 0f) return;
-
         float newFrac = Math.min(1f, g.wallHealthFraction + amount / tm);
         syncHealth(g, newFrac);
     }
@@ -69,7 +80,7 @@ public class GroupWallBuild extends Wall.WallBuild {
     /** 无参 heal()（全恢复）也走群血池 */
     @Override
     public void heal() {
-        FactoryGroup g = GroupManager.getWallGroup(this);
+        FactoryGroup g = GroupManager.getGroup(this);
         if (g == null || g.members.size <= 1) {
             super.heal();
             return;
