@@ -76,8 +76,10 @@ public class GroupManager {
     }
 
     private static void refreshPower(FactoryGroup group) {
-        // 直接遍历，不再 members.toSeq()：这里不存在成员变动，无需快照
-        for (Building b : group.members) {
+        // 必须先快照：updatePowerGraph() 内部会走 getPowerConnections()，
+        // 那里会再次遍历同一个 group.members。Arc 的 ObjectSet 不允许嵌套迭代。
+        arc.struct.Seq<Building> snapshot = group.members.toSeq();
+        for (Building b : snapshot) {
             if (b != null && b.power != null && b.isValid()) {
                 b.updatePowerGraph();
             }
