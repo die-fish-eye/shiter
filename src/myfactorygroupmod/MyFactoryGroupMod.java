@@ -66,14 +66,6 @@ public class MyFactoryGroupMod extends Mod {
         }, 0.5f, 0.5f);
     }
 
-    @Override
-    public void dispose() {
-        if (sweepTask != null) {
-            sweepTask.cancel();
-            sweepTask = null;
-        }
-    }
-
     private void patchFactoryBuilds() {
         int patched = 0;
         for (Block b : Vars.content.blocks()) {
